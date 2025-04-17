@@ -1,19 +1,32 @@
 local M = {}
 
--- Sanitize path to remove trailing slashes
-local function sanitize_path(path)
-    -- Remove trailing slashes, but preserve root path
-    return path:gsub("(.-)/*$", "%1")
+-- Utility function to create directory
+local function create_directory(path)
+    -- Use vim's mkdir to ensure correct path handling
+    local success, err = pcall(function()
+        vim.fn.mkdir(path, "p")
+    end)
+    
+    if not success then
+        vim.notify("Failed to create directory: " .. path .. "\nError: " .. tostring(err), vim.log.levels.ERROR)
+        return false
+    end
+    return true
 end
+
+-- Require telescope (optional dependency)
+local has_telescope, telescope = pcall(require, 'telescope.builtin')
 
 -- Plugin configuration with default values
 M.config = {
-    -- Default path for todo files (absolute path)
+    -- Default path for todo files
     todo_dir = "/tmp/todo",
     -- Default filename for active todos
     active_todo_file = "todos.md",
     -- Default filename for completed todos
-    completed_todo_file = "completed_todos.md"
+    completed_todo_file = "completed_todos.md",
+    -- Use telescope if available
+    use_telescope = has_telescope
 }
 
 -- Internal state
@@ -23,11 +36,35 @@ local state = {
     completed_todo_file = nil
 }
 
+-- Write content to a file, ensuring file exists and is writable
+local function write_to_file(path, content, mode)
+    mode = mode or "a"
+    local file = io.open(path, mode)
+    if file then
+        file:write(content)
+        file:close()
+        return true
+    end
+    return false
+end
+
+-- Read entire file contents
+local function read_file(path)
+    local file = io.open(path, "r")
+    if file then
+        local content = file:read("*all")
+        file:close()
+        return content
+    end
+    return nil
+end
+
 -- Ensure todo directory and files exist with proper initial content
 local function ensure_todo_files()
     -- Create todo directory if it doesn't exist
-    local mkdir_cmd = string.format("mkdir -p %q", state.todo_dir)
-    os.execute(mkdir_cmd)
+    if not create_directory(state.todo_dir) then
+        return false
+    end
 
     -- Paths for todo files
     local active_path = state.todo_dir .. "/" .. state.active_todo_file
@@ -54,29 +91,8 @@ local function ensure_todo_files()
     -- Create files with initial content
     create_file_if_not_exists(active_path)
     create_file_if_not_exists(completed_path)
-end
 
--- Write content to a file, ensuring file exists and is writable
-local function write_to_file(path, content, mode)
-    mode = mode or "a"
-    local file = io.open(path, mode)
-    if file then
-        file:write(content)
-        file:close()
-        return true
-    end
-    return false
-end
-
--- Read entire file contents
-local function read_file(path)
-    local file = io.open(path, "r")
-    if file then
-        local content = file:read("*all")
-        file:close()
-        return content
-    end
-    return nil
+    return true
 end
 
 -- Add a new todo item
@@ -154,12 +170,54 @@ end
 -- Open todo files or use Telescope if available
 function M.open_todos()
     local active_path = state.todo_dir .. "/" .. state.active_todo_file
-    vim.cmd('edit ' .. active_path)
+    
+    if M.config.use_telescope and telescope then
+        -- Use Telescope to list todos if available
+        telescope.find_files({
+            prompt_title = "Active Todos",
+            cwd = state.todo_dir,
+            attach_mappings = function(prompt_bufnr)
+                local actions = require('telescope.actions')
+                actions.select_default:replace(function()
+                    actions.close(prompt_bufnr)
+                    local selection = require('telescope.actions.state').get_selected_entry()
+                    if selection then
+                        vim.cmd('edit ' .. selection[1])
+                    end
+                end)
+                return true
+            end
+        })
+    else
+        -- Fallback to direct file opening
+        vim.cmd('edit ' .. active_path)
+    end
 end
 
 function M.open_completed_todos()
     local completed_path = state.todo_dir .. "/" .. state.completed_todo_file
-    vim.cmd('edit ' .. completed_path)
+    
+    if M.config.use_telescope and telescope then
+        -- Use Telescope to list completed todos if available
+        telescope.find_files({
+            prompt_title = "Completed Todos",
+            cwd = state.todo_dir,
+            attach_mappings = function(prompt_bufnr)
+                local actions = require('telescope.actions')
+                actions.select_default:replace(function()
+                    actions.close(prompt_bufnr)
+                    local selection = require('telescope.actions.state').get_selected_entry()
+                    if selection then
+                        vim.cmd('edit ' .. selection[1])
+                    end
+                end)
+                return true
+            end
+        })
+    else
+        -- Fallback to direct file opening
+        vim.cmd('edit ' .. completed_path)
+    end
 end
 
 -- Setup function for the plugin
@@ -167,9 +225,9 @@ function M.setup(opts)
     -- Merge user config with default config
     opts = opts or {}
     for k, v in pairs(opts) do
-        -- Sanitize todo_dir to remove trailing slashes
+        -- Remove any trailing slashes for todo_dir
         if k == "todo_dir" then
-            M.config[k] = sanitize_path(v)
+            M.config[k] = v:gsub("/*$", "")
         else
             M.config[k] = v
         end
@@ -181,7 +239,10 @@ function M.setup(opts)
     state.completed_todo_file = M.config.completed_todo_file
     
     -- Ensure todo files exist
-    ensure_todo_files()
+    if not ensure_todo_files() then
+        vim.notify("Failed to set up Nvim Todo plugin", vim.log.levels.ERROR)
+        return
+    end
     
     -- Create user commands
     vim.api.nvim_create_user_command('TodoAdd', function(args)
