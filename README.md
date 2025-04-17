@@ -10,11 +10,13 @@ A powerful and simple todo management plugin for Neovim that helps you organize,
 - 🕰️ Timestamp completed tasks
 - 🔧 Fully configurable
 - 📂 Markdown-based todo tracking
+- 🔍 Optional Telescope integration
 
 ## 🚧 Requirements
 
 - Neovim 0.7+
 - Lua 5.1+
+- (Optional) Telescope.nvim for enhanced file browsing
 
 ## 📦 Installation
 
@@ -22,11 +24,17 @@ A powerful and simple todo management plugin for Neovim that helps you organize,
 
 ```lua
 {
-    'yourusername/nvim-todo',
+    'idossha/nvim-todo',
+    dependencies = {
+        -- Optional: for enhanced file browsing
+        'nvim-telescope/telescope.nvim'
+    },
     config = function()
         require('nvim-todo').setup({
             -- Optional: customize todo directory
-            todo_dir = vim.fn.expand("~/my-todos")
+            todo_dir = vim.fn.expand("~/my-todos"),
+            -- Optional: force disable telescope
+            use_telescope = true
         })
     end
 }
@@ -36,7 +44,11 @@ A powerful and simple todo management plugin for Neovim that helps you organize,
 
 ```lua
 use {
-    'yourusername/nvim-todo',
+    'idossha/nvim-todo',
+    requires = {
+        -- Optional: for enhanced file browsing
+        'nvim-telescope/telescope.nvim'
+    },
     config = function()
         require('nvim-todo').setup()
     end
@@ -51,6 +63,13 @@ use {
 - `:TodoComplete` - Mark the current todo item as completed
 - `:TodoList` - Open active todo list
 - `:TodoCompletedList` - Open completed todo list
+
+### Keybindings
+
+- `<leader>ta` - Add a new todo
+- `<leader>tc` - Complete current todo
+- `<leader>tl` - List todos (uses Telescope if available)
+- `<leader>td` - List completed todos
 
 ### Example Workflow
 
@@ -71,7 +90,8 @@ Default configuration:
 {
     todo_dir = "~/todo",
     active_todo_file = "todos.md",
-    completed_todo_file = "completed_todos.md"
+    completed_todo_file = "completed_todos.md",
+    use_telescope = true  -- Automatically use Telescope if available
 }
 ```
 
