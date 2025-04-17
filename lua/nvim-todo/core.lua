@@ -1,8 +1,8 @@
 local M = {}
 
--- Require telescope 
+-- Require telescope and stats module
 local has_telescope, telescope = pcall(require, 'telescope.builtin')
-local has_telescope_config, telescope_config = pcall(require, 'telescope.config')
+local stats_module = require('nvim-todo.stats')
 
 -- Utility function to create directory
 local function create_directory(path)
@@ -65,16 +65,6 @@ local function read_file(path)
     return nil
 end
 
--- Update statistics file
-local function update_statistics(action, details)
-    local stats_path = state.todo_dir .. "/" .. state.statistics_file
-    local timestamp = generate_timestamp()
-    
-    local stat_entry = string.format("- %s | %s | %s\n", timestamp, action, details)
-    
-    return write_to_file(stats_path, stat_entry)
-end
-
 -- Ensure todo directory and files exist with proper initial content
 local function ensure_todo_files()
     -- Create todo directory if it doesn't exist
@@ -108,9 +98,22 @@ local function ensure_todo_files()
     -- Create files with initial content
     create_file_if_not_exists(active_path, "# Active Todos\n## Tasks\n")
     create_file_if_not_exists(completed_path, "# Completed Todos\n## History\n")
-    create_file_if_not_exists(stats_path, "# Todo Statistics\n## Action Log\n")
+    create_file_if_not_exists(stats_path, "# Todo Statistics\n")
 
     return true
+end
+
+-- Open statistics file with calculated stats
+function M.open_statistics()
+    local active_path = state.todo_dir .. "/" .. state.active_todo_file
+    local completed_path = state.todo_dir .. "/" .. state.completed_todo_file
+    local stats_path = state.todo_dir .. "/" .. state.statistics_file
+    
+    -- Calculate and update statistics
+    stats_module.update_statistics_file(active_path, completed_path, stats_path)
+    
+    -- Open the stats file
+    vim.cmd('edit ' .. stats_path)
 end
 
 -- Add a new todo item
@@ -127,9 +130,6 @@ function M.add_todo(todo_text)
     local success = write_to_file(active_path, todo_item)
     
     if success then
-        -- Update statistics
-        update_statistics("ADD_TODO", todo_text)
-        
         vim.notify("Todo added: " .. todo_text, vim.log.levels.INFO)
         
         -- Reload the file if it's currently open
@@ -178,10 +178,10 @@ function M.complete_todo()
                 local success_active = write_to_file(active_path, active_content, "w")
                 
                 if success_completed and success_active then
-                    -- Update statistics
-                    update_statistics("COMPLETE_TODO", todo_text)
-                    
                     vim.notify("Todo completed: " .. todo_text, vim.log.levels.INFO)
+                    
+                    -- Trigger stats update
+                    M.open_statistics()
                     
                     -- Reload the file
                     vim.cmd('edit!')
@@ -232,7 +232,7 @@ function M.live_grep_todos()
     })
 end
 
--- Open todo files or use Telescope if available
+-- Open todo files
 function M.open_todos()
     local active_path = state.todo_dir .. "/" .. state.active_todo_file
     vim.cmd('edit ' .. active_path)
@@ -241,11 +241,6 @@ end
 function M.open_completed_todos()
     local completed_path = state.todo_dir .. "/" .. state.completed_todo_file
     vim.cmd('edit ' .. completed_path)
-end
-
-function M.open_statistics()
-    local stats_path = state.todo_dir .. "/" .. state.statistics_file
-    vim.cmd('edit ' .. stats_path)
 end
 
 -- Setup function for the plugin
