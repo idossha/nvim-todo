@@ -27,41 +27,53 @@ function M.calculate_todo_stats(active_path, completed_path)
         return nil
     end
 
-    -- Count total and completed todos using improved regex
+    -- Improved function to extract todos with timestamps
+    local function extract_todos(content, is_completed)
+        local todos = {}
+        local pattern = is_completed and 
+            "^%- %[x%] (.-)%s*%(Created: (%d+-%d+-%d+ %d+:%d+:%d+)%)%s*%(Completed: (%d+-%d+-%d+ %d+:%d+:%d+)%)" or
+            "^%- %[ %] (.-)%s*%(Created: (%d+-%d+-%d+ %d+:%d+:%d+)%)"
+        
+        for line in content:gmatch("[^\r\n]+") do
+            local todo, create_time, complete_time = line:match(pattern)
+            if todo then
+                table.insert(todos, {
+                    text = todo,
+                    created = create_time,
+                    completed = complete_time,
+                    is_completed = is_completed
+                })
+            end
+        end
+        return todos
+    end
+
+    -- Read and extract todos from both files
     local active_content = read_file(active_path) or ""
     local completed_content = read_file(completed_path) or ""
     
-    -- Improved regex for counting todos with optional timestamp
-    local function count_todos(content, completed)
-        local count = 0
-        for line in content:gmatch("[^\r\n]+") do
-            local todo_pattern = completed and 
-                "^%- %[x%].-%(Created: (%d+-%d+-%d+ %d+:%d+:%d+)%)%s*%(Completed: (%d+-%d+-%d+ %d+:%d+:%d+)%)" 
-                or "^%- %[ %]"
-            
-            if line:match(todo_pattern) then
-                count = count + 1
-            end
-        end
-        return count
-    end
+    local active_todos = extract_todos(active_content, false)
+    local completed_todos = extract_todos(completed_content, true)
+    
+    -- Combine todos
+    local all_todos = {}
+    for _, todo in ipairs(active_todos) do table.insert(all_todos, todo) end
+    for _, todo in ipairs(completed_todos) do table.insert(all_todos, todo) end
 
-    local total_todos = count_todos(active_content, false) + count_todos(completed_content, true)
-    local active_todos = count_todos(active_content, false)
-    local completed_todos = count_todos(completed_content, true)
-
-    -- Calculate completion times for completed todos
+    -- Calculate completion times
     local completion_times = {}
-    for create_time, complete_time in completed_content:gmatch("Created: (%d+-%d+-%d+ %d+:%d+:%d+).-Completed: (%d+-%d+-%d+ %d+:%d+:%d+)") do
-        local create_timestamp = parse_timestamp(create_time)
-        local complete_timestamp = parse_timestamp(complete_time)
-        
-        -- Calculate completion time in hours
-        local completion_time = (complete_timestamp - create_timestamp) / 3600
-        table.insert(completion_times, completion_time)
+    for _, todo in ipairs(all_todos) do
+        if todo.is_completed then
+            local create_timestamp = parse_timestamp(todo.created)
+            local complete_timestamp = parse_timestamp(todo.completed)
+            
+            -- Calculate completion time in hours
+            local completion_time = (complete_timestamp - create_timestamp) / 3600
+            table.insert(completion_times, completion_time)
+        end
     end
 
-    -- Calculate mean and standard deviation of completion times
+    -- Calculate statistics
     local function calculate_stats(times)
         if #times == 0 then return 0, 0 end
         
@@ -82,18 +94,24 @@ function M.calculate_todo_stats(active_path, completed_path)
         return mean, std_dev
     end
 
+    -- Count todos
+    local total_todos = #all_todos
+    local active_todo_count = #active_todos
+    local completed_todo_count = #completed_todos
+
+    -- Calculate mean and standard deviation
     local mean_completion_time, std_dev_completion_time = calculate_stats(completion_times)
 
     -- Prepare stats string
     local stats_content = "# Todo Statistics\n\n"
     stats_content = stats_content .. string.format("## Completion Metrics\n\n")
     stats_content = stats_content .. string.format("- **Total Todos**: %d\n", total_todos)
-    stats_content = stats_content .. string.format("- **Active Todos**: %d\n", active_todos)
-    stats_content = stats_content .. string.format("- **Completed Todos**: %d\n", completed_todos)
+    stats_content = stats_content .. string.format("- **Active Todos**: %d\n", active_todo_count)
+    stats_content = stats_content .. string.format("- **Completed Todos**: %d\n", completed_todo_count)
     
     -- Calculate completion percentage
     local completion_percentage = total_todos > 0 and 
-        (completed_todos / total_todos) * 100 or 0
+        (completed_todo_count / total_todos) * 100 or 0
     stats_content = stats_content .. string.format("- **Completion Rate**: %.2f%%\n\n", completion_percentage)
     
     stats_content = stats_content .. "## Completion Time Analysis\n\n"
