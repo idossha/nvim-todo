@@ -20,52 +20,32 @@ end
 
 -- Create stats window
 local function create_window()
-  -- Create buffer if it doesn't exist
-  if not M.state.buffer or not api.nvim_buf_is_valid(M.state.buffer) then
-    M.state.buffer = api.nvim_create_buf(false, true)
-    api.nvim_buf_set_option(M.state.buffer, "bufhidden", "wipe")
-    api.nvim_buf_set_option(M.state.buffer, "filetype", "todo_stats")
-  end
-  
-  -- Calculate window size and position
-  local width = config.ui.width
-  local height = 15  -- Smaller than the regular todo window
+  local width = math.floor(vim.o.columns * 0.4)  -- 40% of screen width
+  local height = math.floor(vim.o.lines * 0.4)   -- 40% of screen height
   local row = math.floor((vim.o.lines - height) / 2)
   local col = math.floor((vim.o.columns - width) / 2)
   
-  -- Window options
-  local opts = {
+  -- Create buffer
+  local buf = api.nvim_create_buf(false, true)
+  api.nvim_buf_set_option(buf, "bufhidden", "wipe")
+  api.nvim_buf_set_option(buf, "filetype", "todo_stats")
+  
+  -- Create window
+  local win = api.nvim_open_win(buf, true, {
     relative = "editor",
     width = width,
     height = height,
     row = row,
     col = col,
     style = "minimal",
-    border = config.ui.border,
+    border = "rounded",
     title = " Todo Statistics ",
     title_pos = "center",
-  }
-  
-  -- Create window if it doesn't exist or is not valid
-  if not M.state.window or not api.nvim_win_is_valid(M.state.window) then
-    M.state.window = api.nvim_open_win(M.state.buffer, true, opts)
-    api.nvim_win_set_option(M.state.window, "winhighlight", "Normal:Normal,FloatBorder:FloatBorder")
-  end
-  
-  -- Set buffer options
-  api.nvim_buf_set_option(M.state.buffer, "modifiable", false)
-  api.nvim_buf_set_option(M.state.buffer, "buftype", "nofile")
-  
-  -- Set up keybindings
-  api.nvim_buf_set_keymap(M.state.buffer, "n", "q", "", {
-    noremap = true,
-    silent = true,
-    callback = function()
-      api.nvim_win_close(M.state.window, true)
-      M.state.window = nil
-      M.state.buffer = nil
-    end,
   })
+  
+  api.nvim_win_set_option(win, "winhighlight", "Normal:Normal,FloatBorder:FloatBorder")
+  
+  return buf, win
 end
 
 -- Render statistics
@@ -154,7 +134,7 @@ end
 
 -- Show statistics window
 function M.show()
-  create_window()
+  local buf, win = create_window()
   render_stats()
 end
 
