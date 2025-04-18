@@ -1,13 +1,15 @@
 # 📝 todo.nvim
 
-A lightweight and powerful Neovim plugin for managing todos directly from your editor.
+A simple and efficient todo management plugin for Neovim.
 
 ## Features
 
-- 📋 **Intuitive UI**: Beautiful floating window interface for todo management
-- 🏷️ **Rich metadata**: Support for tags, projects, priorities, and due dates
-- 📊 **Statistics**: Track your productivity with built-in statistics
-- 🔍 **Search & Filter**: Easily find and filter todos by various criteria
+- Create and manage todos with descriptions
+- Add tags, priorities, and due dates
+- Sort and filter todos
+- View todo statistics
+- Automatic description preview when hovering over todos
+- Simple and intuitive interface
 
 ## Requirements
 
@@ -15,114 +17,88 @@ A lightweight and powerful Neovim plugin for managing todos directly from your e
 
 ## Installation
 
-### Plugin Installation
-
-Using [packer.nvim](https://github.com/wbthomason/packer.nvim):
-
-```lua
-use {
-  'idossha/todo.nvim',
-  requires = {
-    'nvim-lua/plenary.nvim', -- For utilities
-  },
-  config = function()
-    require('todo').setup({
-      -- Your configuration here
-    })
-  end
-}
-```
-
 Using [lazy.nvim](https://github.com/folke/lazy.nvim):
 
 ```lua
 {
-  'idossha/todo.nvim',
-  dependencies = {
-    'nvim-lua/plenary.nvim',
-  },
+  "idohaber/todo.nvim",
+  dependencies = { "nvim-lua/plenary.nvim" },
   config = function()
-    require('todo').setup({
-      storage = {
-        path = vim.fn.stdpath("data") .. "/todo.json", -- Where to store the todo data
-      },
-      ui = {
-        width = 60,        -- Width of the todo window
-        height = 20,       -- Height of the todo window
-        border = "rounded" -- Border style
-      }
-    })
-  end
+    require("todo").setup()
+  end,
 }
 ```
 
-## Setup
+## Usage
 
-By default, todos are stored in a JSON file at `~/.local/share/nvim/todo.json`. You can customize this location:
+### Commands
+
+- `:TodoOpen` - Open the todo list window
+- `:TodoAdd` - Add a new todo
+- `:TodoStats` - Show todo statistics
+
+### Keybindings
+
+#### Global Keybindings
+
+- `<leader>to` - Open todo list
+- `<leader>ta` - Add new todo
+- `<leader>ts` - Show todo statistics
+
+#### Todo Window Keybindings
+
+- `a` - Add new todo
+- `d` - Delete todo under cursor
+- `c` - Complete todo under cursor
+- `e` - Edit todo under cursor
+- `t` - Edit tags
+- `p` - Set priority
+- `D` - Set due date
+- `s` - Sort todos
+- `f` - Filter todos
+- `q` - Close todo window
+- `h` - Show help
+
+### Description Preview
+
+When you hover over a todo item that has a description, the description will automatically appear as an indented line below the todo item. The description is highlighted in the Comment highlight group for better visibility.
+
+## Configuration
 
 ```lua
-require('todo').setup({
-  storage = {
-    path = "/path/to/your/todo.json" -- Custom storage path
-  }
+require("todo").setup({
+  -- Default configuration
+  mappings = {
+    open = "<leader>to",
+    add = "<leader>ta",
+    delete = "d",
+    complete = "c",
+    edit = "e",
+    tags = "t",
+    priority = "p",
+    due_date = "D",
+    sort = "s",
+    filter = "f",
+    close = "q",
+  },
 })
 ```
 
-## Usage
+## Statistics
 
-Default commands:
+The statistics window shows:
+- Total number of todos
+- Number of completed todos with percentage
+- Number of pending todos
+- Number of high priority todos
+- Number of overdue todos
+- Number of todos completed today
+- Statistics by project
+- Statistics by tag
 
-- `:TodoOpen` - Open the todo list window
-- `:TodoAdd` - Add a new todo
-- `:TodoComplete <id>` - Mark a todo as completed
-- `:TodoDelete <id>` - Delete a todo
-- `:TodoStats` - View productivity statistics
+## Contributing
 
-## Default Mappings
-
-When the todo window is open:
-
-- `a` - Add a new todo
-- `d` - Delete the todo under cursor
-- `c` - Complete the todo under cursor
-- `e` - Edit the todo under cursor
-- `t` - Add/edit tags
-- `p` - Set priority (H/M/L)
-- `D` - Set due date
-- `s` - Sort todos
-- `f` - Filter todos
-- `q` - Close window
-- `?` - Show help
-
-## License
-
-MIT
-
-## Usage
-
-Default commands:
-
-- `:TodoOpen` - Open the todo list window
-- `:TodoAdd` - Add a new todo
-- `:TodoComplete <id>` - Mark a todo as completed
-- `:TodoDelete <id>` - Delete a todo
-- `:TodoStats` - View productivity statistics
-
-## Default Mappings
-
-When the todo window is open:
-
-- `a` - Add a new todo
-- `d` - Delete the todo under cursor
-- `c` - Complete the todo under cursor
-- `e` - Edit the todo under cursor
-- `t` - Add/edit tags
-- `p` - Set priority (H/M/L)
-- `D` - Set due date
-- `s` - Sort todos
-- `f` - Filter todos
-- `q` - Close window
-- `?` - Show help
+Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## License
 
