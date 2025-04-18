@@ -12,6 +12,11 @@ function M.setup()
     desc = "Open the todo list window",
   })
   
+  -- Add leader keybinds
+  vim.keymap.set("n", "<leader>to", todo.open, { desc = "Open todo list" })
+  vim.keymap.set("n", "<leader>ta", function() todo.add() end, { desc = "Add new todo" })
+  vim.keymap.set("n", "<leader>ts", todo.stats, { desc = "Show todo statistics" })
+  
   api.nvim_create_user_command("TodoAdd", function(opts)
     local args = opts.args
     if args and args ~= "" then

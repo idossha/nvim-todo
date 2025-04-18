@@ -16,6 +16,15 @@ function M.create(state)
   -- Calculate window size and position
   local width = config.ui.width
   local height = config.ui.height
+  
+  -- Convert percentages to actual dimensions if needed
+  if width <= 1 then
+    width = math.floor(vim.o.columns * width)
+  end
+  if height <= 1 then
+    height = math.floor(vim.o.lines * height)
+  end
+  
   local row = math.floor((vim.o.lines - height) / 2)
   local col = math.floor((vim.o.columns - width) / 2)
   

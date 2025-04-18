@@ -6,8 +6,8 @@ M.config = {
     path = vim.fn.stdpath("data") .. "/todo.json", -- Default path for storing todos
   },
   ui = {
-    width = 60,        -- Width of the todo window
-    height = 20,       -- Height of the todo window
+    width = 0.8,        -- Width of the todo window (80% of screen)
+    height = 0.8,       -- Height of the todo window (80% of screen)
     border = "rounded", -- Border style
     highlight = {
       priority_high = "TodoHighPriority",
