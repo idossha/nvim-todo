@@ -137,16 +137,16 @@ function M.setup_keymaps(state)
       
       if id then
         local todo = require("todo.storage").get_todo(id)
-        if todo and todo.description then
+        if todo and todo.description and todo.description:match("%S") then
           -- Get current lines
           local lines = api.nvim_buf_get_lines(state.buffer, 0, -1, false)
           
           -- Check if description is already shown
           if not state.showing_description then
             -- Insert description after the current line
-            table.insert(lines, line + 1, "  └─ " .. todo.description)
+            table.insert(lines, line, "  └─ " .. todo.description)
             state.showing_description = true
-            state.description_line = line + 1
+            state.description_line = line
           else
             -- Update existing description
             lines[state.description_line] = "  └─ " .. todo.description
