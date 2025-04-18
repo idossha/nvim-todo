@@ -119,6 +119,7 @@ end
 -- Add a new todo item
 function M.add_todo(todo_text)
     local active_path = state.todo_dir .. "/" .. state.active_todo_file
+    local stats_path = state.todo_dir .. "/" .. state.statistics_file
     
     -- Generate timestamp for creation
     local creation_timestamp = generate_timestamp()
@@ -137,6 +138,19 @@ function M.add_todo(todo_text)
         if bufnr ~= -1 then
             vim.cmd('edit!')
         end
+        
+        -- Update statistics file silently
+        stats_module.update_statistics_file(active_path, 
+            state.todo_dir .. "/" .. state.completed_todo_file, 
+            stats_path)
+        
+        -- Refresh stats buffer if open
+        local stats_bufnr = vim.fn.bufnr(stats_path)
+        if stats_bufnr ~= -1 then
+            vim.api.nvim_buf_call(stats_bufnr, function()
+                vim.cmd('edit!')
+            end)
+        end
     else
         vim.notify("Failed to add todo", vim.log.levels.ERROR)
     end
@@ -146,6 +160,7 @@ end
 function M.complete_todo()
     local active_path = state.todo_dir .. "/" .. state.active_todo_file
     local completed_path = state.todo_dir .. "/" .. state.completed_todo_file
+    local stats_path = state.todo_dir .. "/" .. state.statistics_file
     
     -- Get current line and buffer details
     local current_line = vim.fn.getline('.')
@@ -158,7 +173,7 @@ function M.complete_todo()
     -- Check if line is a todo item
     if current_line:match("^%- %[ %]") then
         -- Remove checkbox and mark as completed
-        local todo_text = current_line:gsub("^%- %[ %] ", "")
+        local todo_text = current_line:gsub("^%- %[ %] ", ""):gsub("%s*$", "")
         local completion_date = generate_timestamp()
         
         -- Completed todo item
@@ -171,7 +186,7 @@ function M.complete_todo()
             -- Remove from active todos
             local active_content = read_file(active_path)
             if active_content then
-                -- Remove the completed line
+                -- Remove the completed line, trimming trailing whitespace
                 active_content = active_content:gsub(vim.pesc(current_line), "")
                 
                 -- Write back to active todos file
@@ -180,11 +195,19 @@ function M.complete_todo()
                 if success_completed and success_active then
                     vim.notify("Todo completed: " .. todo_text, vim.log.levels.INFO)
                     
-                    -- Trigger stats update
-                    M.open_statistics()
+                    -- Update statistics file silently
+                    stats_module.update_statistics_file(active_path, completed_path, stats_path)
                     
                     -- Reload the file
                     vim.cmd('edit!')
+                    
+                    -- Refresh stats buffer if open
+                    local stats_bufnr = vim.fn.bufnr(stats_path)
+                    if stats_bufnr ~= -1 then
+                        vim.api.nvim_buf_call(stats_bufnr, function()
+                            vim.cmd('edit!')
+                        end)
+                    end
                 else
                     vim.notify("Failed to complete todo", vim.log.levels.ERROR)
                 end
