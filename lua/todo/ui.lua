@@ -1,9 +1,9 @@
 local M = {}
 
 -- Import required modules
-local config = require('nvim-todo.config')
-local db = require('nvim-todo.db')
-local utils = require('nvim-todo.utils')
+local config = require('todo.config')
+local db = require('todo.db')
+local utils = require('todo.utils')
 
 -- UI state
 local state = {

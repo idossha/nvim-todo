@@ -1,6 +1,6 @@
 local M = {}
-local utils = require('nvim-todo.utils')
-local config = require('nvim-todo.config')
+local config = require('todo.config')
+local utils = require('todo.utils')
 
 -- Ensure todo files exist with proper initial content
 function M.ensure_todo_files()

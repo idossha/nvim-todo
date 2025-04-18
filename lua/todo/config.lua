@@ -1,10 +1,10 @@
 local M = {}
-local utils = require('nvim-todo.utils')
+local utils = require('todo.utils')
 
 -- Default configuration
 local default_config = {
     -- Database configuration
-    db_path = vim.fn.expand("~/.local/share/nvim/nvim-todo/todo.db"),
+    db_path = vim.fn.expand("~/.local/share/nvim/todo.nvim/todo.db"),
     -- UI Settings
     ui = {
         width = 80,  -- Width of the floating window

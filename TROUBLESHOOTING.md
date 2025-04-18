@@ -1,13 +1,13 @@
-# Troubleshooting Guide for nvim-todo
+# Troubleshooting Guide for todo.nvim
 
-This guide addresses common issues that you might encounter when using nvim-todo.
+This guide addresses common issues that you might encounter when using todo.nvim.
 
 ## Circular Dependencies Error
 
 **Error:**
 ```
-Failed to run `config` for nvim-todo
-/Users/idohaber/.config/nvim/lua/idossha/plugins/todo.lua:4: loop or previous error loading module 'nvim-todo'
+Failed to run `config` for todo.nvim
+/Users/idossha/.config/nvim/lua/idossha/plugins/todo.lua:4: loop or previous error loading module 'todo'
 ```
 
 **Solution:**
@@ -21,13 +21,13 @@ This error occurs due to circular module dependencies in the plugin. We've fixed
 If you're still experiencing this error:
 - Make sure you're using the latest version of the plugin
 - Try removing any custom configurations temporarily to see if they're causing issues
-- Check if you have any other plugins that might be conflicting with nvim-todo
+- Check if you have any other plugins that might be conflicting with todo.nvim
 
 ## SQLite Syntax Error
 
 **Error:**
 ```
-...er/.local/share/nvim/lazy/nvim-todo/lua/nvim-todo/db.lua:301: unexpected symbol near '}'
+...er/.local/share/nvim/lazy/todo.nvim/lua/todo/db.lua:301: unexpected symbol near '}'
 ```
 
 **Solution:**
@@ -81,17 +81,17 @@ This plugin requires the sqlite.lua library:
 If you're experiencing problems with the database:
 
 1. Check file permissions:
-   - The plugin tries to create a database at `~/.local/share/nvim/nvim-todo/todo.db`
+   - The plugin tries to create a database at `~/.local/share/nvim/todo.nvim/todo.db`
    - Ensure your user has write permissions to this location
 
 2. Reset the database:
    ```bash
-   rm ~/.local/share/nvim/nvim-todo/todo.db
+   rm ~/.local/share/nvim/todo.nvim/todo.db
    ```
 
 3. Specify a custom database location in your config:
    ```lua
-   require('nvim-todo').setup({
+   require('todo').setup({
        db_path = vim.fn.expand("~/custom/path/todo.db"),
    })
    ```
@@ -103,7 +103,7 @@ If the plugin fails to load correctly:
 1. Check your plugin manager setup
 2. Ensure you're calling `setup()` after loading the plugin:
    ```lua
-   require('nvim-todo').setup({
+   require('todo').setup({
        -- Your configuration here
    })
    ```

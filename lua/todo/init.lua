@@ -4,13 +4,13 @@ local M = {}
 -- Setup function to be called by user
 function M.setup(opts)
     -- Load config first
-    local config = require('nvim-todo.config')
+    local config = require('todo.config')
     config.setup(opts)
     
     -- Then load other modules
-    local db = require('nvim-todo.db')
-    local ui = require('nvim-todo.ui')
-    local core = require('nvim-todo.core')
+    local db = require('todo.db')
+    local ui = require('todo.ui')
+    local core = require('todo.core')
     
     -- Initialize database
     if not db.setup() then
@@ -107,39 +107,39 @@ end
 
 -- Export functions for the public API
 function M.add_todo(...)
-    return require('nvim-todo.core').add_todo(...)
+    return require('todo.core').add_todo(...)
 end
 
 function M.complete_todo(...)
-    return require('nvim-todo.core').complete_todo(...)
+    return require('todo.core').complete_todo(...)
 end
 
 function M.delete_todo(...)
-    return require('nvim-todo.core').delete_todo(...)
+    return require('todo.core').delete_todo(...)
 end
 
 function M.show_statistics(...)
-    return require('nvim-todo.core').show_statistics(...)
+    return require('todo.core').show_statistics(...)
 end
 
 function M.migrate_to_database(...)
-    return require('nvim-todo.core').migrate_to_database(...)
+    return require('todo.core').migrate_to_database(...)
 end
 
 function M.export_database_to_files(...)
-    return require('nvim-todo.core').export_database_to_files(...)
+    return require('todo.core').export_database_to_files(...)
 end
 
 function M.toggle_view_mode(...)
-    return require('nvim-todo.core').toggle_view_mode(...)
+    return require('todo.core').toggle_view_mode(...)
 end
 
 function M.search_todos(...)
-    return require('nvim-todo.core').search_todos(...)
+    return require('todo.core').search_todos(...)
 end
 
 function M.open_todo_ui(...)
-    return require('nvim-todo.ui').open(...)
+    return require('todo.ui').open(...)
 end
 
-return M
+return M 

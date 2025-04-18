@@ -1,10 +1,10 @@
 local M = {}
-local utils = require('nvim-todo.utils')
-local config_module = require('nvim-todo.config')
-local files_module = require('nvim-todo.files')
+local utils = require('todo.utils')
+local config_module = require('todo.config')
+local files_module = require('todo.files')
 
 -- Import the database module
-local db = require('nvim-todo.db')
+local db = require('todo.db')
 
 -- Function to create a directory
 local function create_directory(path)

@@ -1,12 +1,12 @@
 local M = {}
 
 -- Import required modules
-local config = require('nvim-todo.config')
-local db = require('nvim-todo.db')
-local files = require('nvim-todo.files')
-local stats = require('nvim-todo.stats')
-local migration = require('nvim-todo.migration')
-local utils = require('nvim-todo.utils')
+local config = require('todo.config')
+local db = require('todo.db')
+local files = require('todo.files')
+local stats = require('todo.stats')
+local migration = require('todo.migration')
+local utils = require('todo.utils')
 
 -- We'll load the UI module later to avoid circular dependencies
 local ui = nil
@@ -14,7 +14,7 @@ local ui = nil
 -- Helper function to get UI module when needed
 local function get_ui()
     if not ui then
-        ui = require('nvim-todo.ui')
+        ui = require('todo.ui')
     end
     return ui
 end
@@ -29,12 +29,6 @@ function M.setup(opts)
         vim.notify("Failed to initialize database", vim.log.levels.ERROR)
         return false
     end
-    
-    -- Create user commands
-    M.create_commands()
-    
-    -- Set up keymaps
-    M.create_keymaps()
     
     -- Check for migration if needed
     migration.check_and_migrate()
@@ -263,4 +257,4 @@ function M.export_database_to_files()
     return migration.export_from_db(config.get().db_path)
 end
 
-return M
+return M 

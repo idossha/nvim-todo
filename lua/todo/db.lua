@@ -1,11 +1,11 @@
 local M = {}
-local utils = require('nvim-todo.utils')
+local utils = require('todo.utils')
 local config_module
 
 -- Delay the loading of config_module to avoid circular dependency
 local function get_config()
     if not config_module then
-        config_module = require('nvim-todo.config')
+        config_module = require('todo.config')
     end
     return config_module
 end
@@ -474,7 +474,7 @@ function M.get_active_todos(filters)
             table.insert(query_parts, #query_parts + 1, "AND t.due_date <= ? AND t.due_date != ''")
             table.insert(params, filters.due_before)
         end
-    }
+    end
     
     -- Add order clause
     table.insert(query_parts, "ORDER BY CASE WHEN t.due_date = '' THEN 1 ELSE 0 END, t.due_date, t.priority DESC, t.created_at")
@@ -518,7 +518,7 @@ function M.get_completed_todos(filters)
             table.insert(query_parts, #query_parts + 1, "AND t.completed_at >= ?")
             table.insert(params, filters.completed_after)
         end
-    }
+    end
     
     -- Add order clause
     table.insert(query_parts, "ORDER BY t.completed_at DESC")

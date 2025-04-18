@@ -1,8 +1,8 @@
 local M = {}
 
-local utils = require('nvim-todo.utils')
-local config = require('nvim-todo.config')
-local files = require('nvim-todo.files')
+local utils = require('todo.utils')
+local config = require('todo.config')
+local files = require('todo.files')
 
 -- Parse todo files to get statistics
 local function calculate_file_stats()

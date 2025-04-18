@@ -1,4 +1,4 @@
-# 📝 nvim-todo
+# 📝 todo.nvim
 
 A lightweight and powerful Neovim plugin for managing todos directly from your editor.
 
@@ -16,9 +16,9 @@ A lightweight and powerful Neovim plugin for managing todos directly from your e
 
 ```lua
 {
-    "idohaber/todo.nvim",
+    "idossha/todo.nvim",
     config = function()
-        require("nvim-todo").setup({
+        require("todo").setup({
             -- Optional configuration (see Configuration section)
         })
     end,
@@ -33,10 +33,10 @@ A lightweight and powerful Neovim plugin for managing todos directly from your e
 
 ```lua
 use {
-    "idohaber/todo.nvim",
+    "idossha/todo.nvim",
     requires = {"kkharji/sqlite.lua"},
     config = function()
-        require("nvim-todo").setup({
+        require("todo").setup({
             -- Optional configuration (see Configuration section)
         })
     end
@@ -48,9 +48,9 @@ use {
 Here's a sample configuration with the default values:
 
 ```lua
-require('nvim-todo').setup({
+require('todo').setup({
     -- Database configuration
-    db_path = vim.fn.expand("~/.local/share/nvim/nvim-todo/todo.db"),
+    db_path = vim.fn.expand("~/.local/share/nvim/todo.nvim/todo.db"),
     -- UI Settings
     ui = {
         width = 80,  -- Width of the floating window
@@ -122,7 +122,7 @@ Example: `!! Finish documentation #docs @blog due:2023-08-15`
 The plugin requires the Lua SQLite module. If you see an error about SQLite, make sure you have installed `sqlite.lua` and that it's working correctly.
 
 ### Database errors
-If you encounter database-related errors, try deleting the database file (`~/.local/share/nvim/nvim-todo/todo.db` by default) and restarting Neovim.
+If you encounter database-related errors, try deleting the database file (`~/.local/share/nvim/todo.nvim/todo.db` by default) and restarting Neovim.
 
 ## License
 
