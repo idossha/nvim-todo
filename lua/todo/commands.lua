@@ -2,7 +2,7 @@ local M = {}
 
 local api = vim.api
 local todo = require("todo")
-local config = require("todo").config
+local config = require("todo.config")
 
 -- Register all plugin commands
 function M.setup()
@@ -14,56 +14,56 @@ function M.setup()
   })
   
   -- Add keybindings for todo commands
-  vim.keymap.set("n", config.mappings.open, function()
+  vim.keymap.set("n", config.default_config.mappings.open, function()
     require("todo.ui").open()
   end, { desc = "Open todo list" })
 
-  vim.keymap.set("n", config.mappings.add, function()
+  vim.keymap.set("n", config.default_config.mappings.add, function()
     require("todo.ui").open()
     require("todo.ui.actions").add_todo()
   end, { desc = "Add new todo" })
 
-  vim.keymap.set("n", config.mappings.delete, function()
+  vim.keymap.set("n", config.default_config.mappings.delete, function()
     require("todo.ui").open()
     require("todo.ui.actions").delete_todo_under_cursor()
   end, { desc = "Delete todo under cursor" })
 
-  vim.keymap.set("n", config.mappings.complete, function()
+  vim.keymap.set("n", config.default_config.mappings.complete, function()
     require("todo.ui").open()
     require("todo.ui.actions").complete_todo_under_cursor()
   end, { desc = "Complete todo under cursor" })
 
-  vim.keymap.set("n", config.mappings.edit, function()
+  vim.keymap.set("n", config.default_config.mappings.edit, function()
     require("todo.ui").open()
     require("todo.ui.actions").edit_todo_under_cursor()
   end, { desc = "Edit todo under cursor" })
 
-  vim.keymap.set("n", config.mappings.tags, function()
+  vim.keymap.set("n", config.default_config.mappings.tags, function()
     require("todo.ui").open()
     require("todo.ui.actions").edit_tags()
   end, { desc = "Edit todo tags" })
 
-  vim.keymap.set("n", config.mappings.priority, function()
+  vim.keymap.set("n", config.default_config.mappings.priority, function()
     require("todo.ui").open()
     require("todo.ui.actions").set_priority()
   end, { desc = "Set todo priority" })
 
-  vim.keymap.set("n", config.mappings.due_date, function()
+  vim.keymap.set("n", config.default_config.mappings.due_date, function()
     require("todo.ui").open()
     require("todo.ui.actions").set_due_date()
   end, { desc = "Set todo due date" })
 
-  vim.keymap.set("n", config.mappings.sort, function()
+  vim.keymap.set("n", config.default_config.mappings.sort, function()
     require("todo.ui").open()
     require("todo.ui.actions").show_sort_menu()
   end, { desc = "Sort todos" })
 
-  vim.keymap.set("n", config.mappings.filter, function()
+  vim.keymap.set("n", config.default_config.mappings.filter, function()
     require("todo.ui").open()
     require("todo.ui.actions").show_filter_menu()
   end, { desc = "Filter todos" })
 
-  vim.keymap.set("n", config.mappings.close, function()
+  vim.keymap.set("n", config.default_config.mappings.close, function()
     require("todo.ui").close()
   end, { desc = "Close todo list" })
   
