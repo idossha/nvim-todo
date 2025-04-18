@@ -109,13 +109,6 @@ function M.setup_keymaps(state)
       callback = func,
     })
   end
-
-  -- Ensure help is always available
-  api.nvim_buf_set_keymap(state.buffer, "n", "?", "", {
-    noremap = true,
-    silent = true,
-    callback = actions.show_help,
-  })
 end
 
 return M

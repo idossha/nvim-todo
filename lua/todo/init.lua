@@ -30,7 +30,7 @@ M.config = {
     sort = "s",
     filter = "f",
     close = "q",
-    help = "?",
+    help = "h",
   },
 }
 
