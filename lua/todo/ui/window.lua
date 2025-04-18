@@ -144,9 +144,9 @@ function M.setup_keymaps(state)
           -- Check if description is already shown
           if not state.showing_description then
             -- Insert description after the current line
-            table.insert(lines, line, "  └─ " .. todo.description)
+            table.insert(lines, line + 1, "  └─ " .. todo.description)
             state.showing_description = true
-            state.description_line = line
+            state.description_line = line + 1
           else
             -- Update existing description
             lines[state.description_line] = "  └─ " .. todo.description

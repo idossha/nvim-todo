@@ -66,6 +66,11 @@ function M.setup()
   vim.keymap.set("n", config.default_config.mappings.close, function()
     require("todo.ui").close()
   end, { desc = "Close todo list" })
+
+  -- Add leader keybind for stats
+  vim.keymap.set("n", "<leader>ts", function()
+    require("todo").stats()
+  end, { desc = "Show todo statistics" })
   
   api.nvim_create_user_command("TodoAdd", function(opts)
     local args = opts.args
