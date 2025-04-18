@@ -1,7 +1,7 @@
 local M = {}
 
 local api = vim.api
-local db = require("todo.db")
+local storage = require("todo.storage")
 local config = require("todo").config
 
 -- State
@@ -72,8 +72,8 @@ local function render_stats()
     return
   end
   
-  -- Get stats from database
-  local stats = db.get_stats()
+  -- Get stats from storage
+  local stats = storage.get_stats()
   if not stats then
     api.nvim_buf_set_option(M.state.buffer, "modifiable", true)
     api.nvim_buf_set_lines(M.state.buffer, 0, -1, false, {
@@ -89,29 +89,33 @@ local function render_stats()
   local lines = {
     "--- Todo Statistics ---",
     "",
-    string.format("Total todos: %d", stats.total and stats.total[1].count or 0),
+    string.format("Total todos: %d", stats.total or 0),
     string.format("Completed: %d (%.1f%%)", 
-      stats.completed and stats.completed[1].count or 0,
-      stats.total and stats.total[1].count > 0 
-        and (stats.completed and stats.completed[1].count or 0) / stats.total[1].count * 100 
+      stats.completed or 0,
+      stats.total > 0 
+        and (stats.completed or 0) / stats.total * 100 
         or 0
     ),
-    string.format("Pending: %d", stats.pending and stats.pending[1].count or 0),
-    string.format("High priority: %d", stats.high_priority and stats.high_priority[1].count or 0),
-    string.format("Overdue: %d", stats.overdue and stats.overdue[1].count or 0),
-    string.format("Completed today: %d", stats.completed_today and stats.completed_today[1].count or 0),
+    string.format("Pending: %d", stats.pending or 0),
+    string.format("High priority: %d", stats.high_priority or 0),
+    string.format("Overdue: %d", stats.overdue or 0),
+    string.format("Completed today: %d", stats.completed_today or 0),
     "",
     "--- By Project ---"
   }
   
   -- Add projects
-  if stats.by_project and #stats.by_project > 0 then
-    for _, row in ipairs(stats.by_project) do
-      if row.project and row.project ~= "" then
-        table.insert(lines, string.format("%s: %d", row.project, row.count))
-      else
-        table.insert(lines, string.format("(no project): %d", row.count))
-      end
+  local project_data = {}
+  for project, count in pairs(stats.by_project or {}) do
+    table.insert(project_data, {project = project, count = count})
+  end
+  
+  -- Sort by count (descending)
+  table.sort(project_data, function(a, b) return a.count > b.count end)
+  
+  if #project_data > 0 then
+    for _, data in ipairs(project_data) do
+      table.insert(lines, string.format("%s: %d", data.project, data.count))
     end
   else
     table.insert(lines, "(no projects)")
@@ -121,11 +125,17 @@ local function render_stats()
   table.insert(lines, "--- By Tag ---")
   
   -- Add tags
-  if stats.by_tags and #stats.by_tags > 0 then
-    for _, row in ipairs(stats.by_tags) do
-      if row.tag and row.tag ~= "" then
-        table.insert(lines, string.format("%s: %d", row.tag, row.count))
-      end
+  local tag_data = {}
+  for tag, count in pairs(stats.by_tags or {}) do
+    table.insert(tag_data, {tag = tag, count = count})
+  end
+  
+  -- Sort by count (descending)
+  table.sort(tag_data, function(a, b) return a.count > b.count end)
+  
+  if #tag_data > 0 then
+    for _, data in ipairs(tag_data) do
+      table.insert(lines, string.format("%s: %d", data.tag, data.count))
     end
   else
     table.insert(lines, "(no tags)")

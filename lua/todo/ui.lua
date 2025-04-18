@@ -1,7 +1,7 @@
 local M = {}
 
 local api = vim.api
-local db = require("todo.db")
+local storage = require("todo.storage")
 local utils = require("todo.utils")
 local config = require("todo").config
 
@@ -98,8 +98,8 @@ local function format_todo(todo)
   local due = ""
   
   if todo.due_date and todo.due_date ~= "" then
-    local is_overdue = not todo.completed and os.time() > os.time(os.date("!*t", todo.due_date))
-    due = " [" .. os.date("%Y-%m-%d", todo.due_date) .. "]"
+    local is_overdue = not todo.completed and utils.is_overdue(todo.due_date)
+    due = " [" .. todo.due_date .. "]"
   end
   
   local priority_marker = ""
@@ -208,7 +208,7 @@ local function render_todos()
         local highlight = config.ui.highlight.due_date
         
         -- Check if overdue
-        if not todo.completed and os.time() > os.time(os.date("!*t", todo.due_date)) then
+        if not todo.completed and utils.is_overdue(todo.due_date) then
           highlight = config.ui.highlight.overdue
         end
         
@@ -226,9 +226,9 @@ local function render_todos()
   end
 end
 
--- Load todos from the database
+-- Load todos from storage
 local function load_todos()
-  local todos = db.get_todos(M.state.filter)
+  local todos = storage.get_todos(M.state.filter)
   M.state.todos = todos or {}
   
   -- Apply current sort
@@ -306,117 +306,6 @@ function M.add_todo(opts)
   opts = opts or {}
   
   -- Create input fields
-  local title = opts.title
-  if not title then
-    title = vim.fn.input("Todo title: ")
-    if title == "" then
-      return
-    end
-  end
-  
-  local description = opts.description
-  if not description and not opts.skip_description then
-    description = vim.fn.input("Description (optional): ")
-  end
-  
-  local priority = opts.priority
-  if not priority and not opts.skip_priority then
-    priority = vim.fn.input("Priority (H/M/L) [M]: ")
-    if priority == "" then
-      priority = "M"
-    end
-    priority = string.upper(string.sub(priority, 1, 1))
-    if not (priority == "H" or priority == "M" or priority == "L") then
-      priority = "M"
-    end
-  end
-  
-  local due_date = opts.due_date
-  if not due_date and not opts.skip_due_date then
-    due_date = vim.fn.input("Due date (YYYY-MM-DD, empty for none): ")
-    -- Validate date format
-    if due_date ~= "" and not due_date:match("^%d%d%d%d%-%d%d%-%d%d$") then
-      vim.notify("Invalid date format. Use YYYY-MM-DD", vim.log.levels.ERROR)
-      return
-    end
-  end
-  
-  local project = opts.project
-  if not project and not opts.skip_project then
-    project = vim.fn.input("Project (optional): ")
-  end
-  
-  local tags = opts.tags
-  if not tags and not opts.skip_tags then
-    local tags_input = vim.fn.input("Tags (comma separated): ")
-    if tags_input ~= "" then
-      tags = vim.split(tags_input, ",")
-      for i, tag in ipairs(tags) do
-        tags[i] = vim.trim(tag)
-      end
-    else
-      tags = {}
-    end
-  end
-  
-  -- Create the todo
-  local todo = {
-    title = title,
-    description = description,
-    priority = priority,
-    due_date = due_date ~= "" and due_date or nil,
-    tags = tags,
-    project = project,
-  }
-  
-  -- Save to database
-  db.create_todo(todo)
-  
-  -- Refresh the view
-  M.refresh()
-end
-
--- Delete todo under cursor
-function M.delete_todo_under_cursor()
-  local id = get_todo_id_at_cursor()
-  if not id then
-    return
-  end
-  
-  local confirm = vim.fn.input("Delete todo? (y/N): ")
-  if confirm:lower() ~= "y" then
-    return
-  end
-  
-  db.delete_todo(id)
-  M.refresh()
-end
-
--- Complete todo under cursor
-function M.complete_todo_under_cursor()
-  local id = get_todo_id_at_cursor()
-  if not id then
-    return
-  end
-  
-  db.complete_todo(id)
-  M.refresh()
-end
-
--- Edit todo under cursor
-function M.edit_todo_under_cursor()
-  local id = get_todo_id_at_cursor()
-  if not id then
-    return
-  end
-  
-  local todo = db.get_todo(id)
-  if not todo then
-    vim.notify("Todo not found", vim.log.levels.ERROR)
-    return
-  end
-  
-  -- Edit fields
   local title = vim.fn.input("Title [" .. todo.title .. "]: ")
   if title == "" then
     title = todo.title
@@ -456,7 +345,7 @@ function M.edit_todo_under_cursor()
     project = project,
   }
   
-  db.update_todo(id, updated_todo)
+  storage.update_todo(id, updated_todo)
   M.refresh()
 end
 
@@ -467,7 +356,7 @@ function M.edit_tags()
     return
   end
   
-  local todo = db.get_todo(id)
+  local todo = storage.get_todo(id)
   if not todo then
     vim.notify("Todo not found", vim.log.levels.ERROR)
     return
@@ -486,7 +375,7 @@ function M.edit_tags()
     tags = todo.tags or {}
   end
   
-  db.update_todo(id, { tags = tags })
+  storage.update_todo(id, { tags = tags })
   M.refresh()
 end
 
@@ -508,7 +397,7 @@ function M.set_priority()
     return
   end
   
-  db.update_todo(id, { priority = priority })
+  storage.update_todo(id, { priority = priority })
   M.refresh()
 end
 
@@ -525,7 +414,7 @@ function M.set_due_date()
     return
   end
   
-  db.update_todo(id, { due_date = due_date })
+  storage.update_todo(id, { due_date = due_date })
   M.refresh()
 end
 
@@ -707,4 +596,115 @@ function M.show_help()
   M.refresh()
 end
 
-return M
+return M opts.title
+  if not title then
+    title = vim.fn.input("Todo title: ")
+    if title == "" then
+      return
+    end
+  end
+  
+  local description = opts.description
+  if not description and not opts.skip_description then
+    description = vim.fn.input("Description (optional): ")
+  end
+  
+  local priority = opts.priority
+  if not priority and not opts.skip_priority then
+    priority = vim.fn.input("Priority (H/M/L) [M]: ")
+    if priority == "" then
+      priority = "M"
+    end
+    priority = string.upper(string.sub(priority, 1, 1))
+    if not (priority == "H" or priority == "M" or priority == "L") then
+      priority = "M"
+    end
+  end
+  
+  local due_date = opts.due_date
+  if not due_date and not opts.skip_due_date then
+    due_date = vim.fn.input("Due date (YYYY-MM-DD, empty for none): ")
+    -- Validate date format
+    if due_date ~= "" and not due_date:match("^%d%d%d%d%-%d%d%-%d%d$") then
+      vim.notify("Invalid date format. Use YYYY-MM-DD", vim.log.levels.ERROR)
+      return
+    end
+  end
+  
+  local project = opts.project
+  if not project and not opts.skip_project then
+    project = vim.fn.input("Project (optional): ")
+  end
+  
+  local tags = opts.tags
+  if not tags and not opts.skip_tags then
+    local tags_input = vim.fn.input("Tags (comma separated): ")
+    if tags_input ~= "" then
+      tags = vim.split(tags_input, ",")
+      for i, tag in ipairs(tags) do
+        tags[i] = vim.trim(tag)
+      end
+    else
+      tags = {}
+    end
+  end
+  
+  -- Create the todo
+  local todo = {
+    title = title,
+    description = description,
+    priority = priority,
+    due_date = due_date ~= "" and due_date or nil,
+    tags = tags,
+    project = project,
+  }
+  
+  -- Save to storage
+  storage.create_todo(todo)
+  
+  -- Refresh the view
+  M.refresh()
+end
+
+-- Delete todo under cursor
+function M.delete_todo_under_cursor()
+  local id = get_todo_id_at_cursor()
+  if not id then
+    return
+  end
+  
+  local confirm = vim.fn.input("Delete todo? (y/N): ")
+  if confirm:lower() ~= "y" then
+    return
+  end
+  
+  storage.delete_todo(id)
+  M.refresh()
+end
+
+-- Complete todo under cursor
+function M.complete_todo_under_cursor()
+  local id = get_todo_id_at_cursor()
+  if not id then
+    return
+  end
+  
+  storage.complete_todo(id)
+  M.refresh()
+end
+
+-- Edit todo under cursor
+function M.edit_todo_under_cursor()
+  local id = get_todo_id_at_cursor()
+  if not id then
+    return
+  end
+  
+  local todo = storage.get_todo(id)
+  if not todo then
+    vim.notify("Todo not found", vim.log.levels.ERROR)
+    return
+  end
+  
+  -- Edit fields
+  local title =

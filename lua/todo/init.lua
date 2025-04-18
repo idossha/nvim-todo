@@ -2,9 +2,8 @@ local M = {}
 
 -- Default configuration
 M.config = {
-  db = {
-    url = nil, -- Database connection URL
-    check_connection = true, -- Check db connection on startup
+  storage = {
+    path = vim.fn.stdpath("data") .. "/todo.json", -- Default path for storing todos
   },
   ui = {
     width = 60,        -- Width of the todo window
@@ -41,24 +40,13 @@ function M.setup(opts)
   if opts then
     M.config = vim.tbl_deep_extend("force", M.config, opts)
   end
-
+  
   -- Load components
-  local db = require("todo.db")
-  local schema = require("todo.schema")
+  local storage = require("todo.storage")
   local commands = require("todo.commands")
   
-  -- Check if db connection is enabled and set up
-  if M.config.db.url and M.config.db.check_connection then
-    if not db.check_connection() then
-      vim.notify("todo.nvim: Could not connect to database. Please check configuration.", vim.log.levels.ERROR)
-      return
-    end
-    
-    -- Initialize schema if needed
-    schema.init()
-  else
-    vim.notify("todo.nvim: Database URL not configured.", vim.log.levels.WARN)
-  end
+  -- Initialize storage
+  storage.init()
   
   -- Set up plugin commands
   commands.setup()
@@ -73,6 +61,8 @@ function M.setup(opts)
     highlight default link TodoOverdue Error
     highlight default link TodoTags Identifier
   ]]
+  
+  vim.notify("Todo.nvim initialized successfully!", vim.log.levels.INFO)
 end
 
 -- Export API functions that will be used by commands
@@ -85,7 +75,7 @@ M.add = function(opts)
 end
 
 M.complete = function(id)
-  require("todo.db").complete_todo(id)
+  require("todo.storage").complete_todo(id)
   -- Refresh UI if open
   if require("todo.ui").is_open() then
     require("todo.ui").refresh()
@@ -93,7 +83,7 @@ M.complete = function(id)
 end
 
 M.delete = function(id)
-  require("todo.db").delete_todo(id)
+  require("todo.storage").delete_todo(id)
   -- Refresh UI if open
   if require("todo.ui").is_open() then
     require("todo.ui").refresh()

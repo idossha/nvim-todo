@@ -39,9 +39,9 @@ function M.is_overdue(date_string)
   end
   
   local today = os.time({
-    year = os.date("%Y"),
-    month = os.date("%m"),
-    day = os.date("%d"),
+    year = tonumber(os.date("%Y")),
+    month = tonumber(os.date("%m")),
+    day = tonumber(os.date("%d")),
     hour = 0,
     min = 0,
     sec = 0
@@ -50,77 +50,19 @@ function M.is_overdue(date_string)
   return timestamp < today
 end
 
--- Get a unique ID for a buffer
-function M.get_buf_id(buf)
-  return "todo_" .. buf
-end
-
--- Escape a string for use in SQL
-function M.sql_escape(str)
-  if not str then
-    return "NULL"
+-- Check if a todo has a specific tag
+function M.has_tag(tags, tag)
+  if not tags or not tag then
+    return false
   end
   
-  -- Replace single quotes with two single quotes
-  return "'" .. string.gsub(str, "'", "''") .. "'"
-end
-
--- Convert a Lua table to a PostgreSQL array string
-function M.to_pg_array(tbl)
-  if not tbl or #tbl == 0 then
-    return "{}"
-  end
-  
-  local escaped = {}
-  for _, v in ipairs(tbl) do
-    table.insert(escaped, M.sql_escape(v))
-  end
-  
-  return "{" .. table.concat(escaped, ",") .. "}"
-end
-
--- Convert a PostgreSQL array string to a Lua table
-function M.from_pg_array(arr_str)
-  if not arr_str or arr_str == "{}" then
-    return {}
-  end
-  
-  -- Remove the leading '{' and trailing '}'
-  local str = string.sub(arr_str, 2, -2)
-  
-  -- Split by commas that are not inside quotes
-  local result = {}
-  local current = ""
-  local in_quotes = false
-  
-  for i = 1, #str do
-    local char = string.sub(str, i, i)
-    
-    if char == "'" then
-      in_quotes = not in_quotes
-    elseif char == "," and not in_quotes then
-      table.insert(result, current)
-      current = ""
-    else
-      current = current .. char
+  for _, t in ipairs(tags) do
+    if t:lower() == tag:lower() then
+      return true
     end
   end
   
-  if current ~= "" then
-    table.insert(result, current)
-  end
-  
-  -- Remove quotes and unescape
-  for i, v in ipairs(result) do
-    if string.sub(v, 1, 1) == "'" and string.sub(v, -1) == "'" then
-      v = string.sub(v, 2, -2)
-      -- Unescape
-      v = string.gsub(v, "''", "'")
-    end
-    result[i] = v
-  end
-  
-  return result
+  return false
 end
 
 -- Deep copy a table
