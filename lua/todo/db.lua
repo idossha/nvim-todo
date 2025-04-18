@@ -31,46 +31,25 @@ local function execute_query(query, params)
   file:write(final_query)
   file:close()
   
-  -- Execute query using vim-dadbod's :DB command
-  local output_file = os.tmpname()
-  local db_url = config.db.url
+  -- Use direct vim-dadbod approach with simpler output handling
+  local success, result = pcall(function()
+    -- Execute the query directly using the DB command
+    local output = vim.fn.systemlist('nvim --headless -c "DB ' .. vim.fn.shellescape(config.db.url) .. ' < ' .. vim.fn.shellescape(temp_file) .. '" -c q')
+    
+    -- Clean up
+    os.remove(temp_file)
+    
+    return output
+  end)
   
-  -- Use :DB to execute the query and redirect output to a file
-  vim.cmd(string.format('redir > %s', output_file))
-  vim.cmd(string.format('silent DB %s < %s', db_url, temp_file))
-  vim.cmd('redir END')
-  
-  -- Read the output
-  local output_handle = io.open(output_file, "r")
-  local result = ""
-  if output_handle then
-    result = output_handle:read("*a")
-    output_handle:close()
+  if not success then
+    vim.notify("Failed to execute database query: " .. tostring(result), vim.log.levels.ERROR)
+    return nil
   end
   
-  -- Clean up
-  os.remove(temp_file)
-  os.remove(output_file)
-  
-  -- Parse result if needed
-  if result and result ~= "" then
-    -- Try to parse as JSON if applicable
-    if result:match("^%s*{") or result:match("^%s*%[") then
-      local ok, parsed = pcall(vim.fn.json_decode, result)
-      if ok then
-        return parsed
-      end
-    end
-    
-    -- Return the result lines as a table
-    local lines = {}
-    for line in result:gmatch("[^\r\n]+") do
-      table.insert(lines, line)
-    end
-    
-    if #lines > 0 then
-      return lines
-    end
+  -- Return the result if successful
+  if result and #result > 0 then
+    return result
   end
   
   return nil
@@ -263,6 +242,8 @@ function M.get_stats()
   
   return stats
 end
+
+return M
 
 -- Check if database connection works
 function M.check_connection()
