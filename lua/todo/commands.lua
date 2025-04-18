@@ -16,6 +16,11 @@ function M.setup()
   vim.keymap.set("n", "<leader>to", todo.open, { desc = "Open todo list" })
   vim.keymap.set("n", "<leader>ta", function() todo.add() end, { desc = "Add new todo" })
   vim.keymap.set("n", "<leader>ts", todo.stats, { desc = "Show todo statistics" })
+  vim.keymap.set("n", "<leader>th", function() 
+    if require("todo.ui").is_open() then
+      require("todo.ui.actions").show_help()
+    end
+  end, { desc = "Show todo help" })
   
   api.nvim_create_user_command("TodoAdd", function(opts)
     local args = opts.args
