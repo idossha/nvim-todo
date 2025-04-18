@@ -1,73 +1,107 @@
 local M = {}
 
 -- Default configuration
-local default_config = require("todo.config").defaults
+M.config = {
+  db = {
+    url = nil, -- Database connection URL
+    check_connection = true, -- Check db connection on startup
+  },
+  ui = {
+    width = 60,        -- Width of the todo window
+    height = 20,       -- Height of the todo window
+    border = "rounded", -- Border style
+    highlight = {
+      priority_high = "TodoHighPriority",
+      priority_medium = "TodoMediumPriority",
+      priority_low = "TodoLowPriority",
+      completed = "TodoCompleted",
+      due_date = "TodoDueDate",
+      overdue = "TodoOverdue",
+      tags = "TodoTags",
+    },
+  },
+  mappings = {
+    add = "a",
+    delete = "d",
+    complete = "c",
+    edit = "e",
+    tags = "t",
+    priority = "p",
+    due_date = "D",
+    sort = "s",
+    filter = "f",
+    close = "q",
+    help = "?",
+  },
+}
 
--- Plugin setup function
-function M.setup(user_config)
-    -- Merge user config with defaults
-    M.config = vim.tbl_deep_extend("force", default_config, user_config or {})
-    
-    -- Ensure database directory exists
-    local db_dir = vim.fn.fnamemodify(M.config.db_path, ":h")
-    if vim.fn.isdirectory(db_dir) == 0 then
-        vim.fn.mkdir(db_dir, "p")
+-- Setup function
+function M.setup(opts)
+  -- Merge user options with defaults
+  if opts then
+    M.config = vim.tbl_deep_extend("force", M.config, opts)
+  end
+
+  -- Load components
+  local db = require("todo.db")
+  local schema = require("todo.schema")
+  local commands = require("todo.commands")
+  
+  -- Check if db connection is enabled and set up
+  if M.config.db.url and M.config.db.check_connection then
+    if not db.check_connection() then
+      vim.notify("todo.nvim: Could not connect to database. Please check configuration.", vim.log.levels.ERROR)
+      return
     end
     
-    -- Initialize the database
-    local success = require("todo.db").init(M.config.db_path)
-    
-    -- Register commands
-    require("todo.commands").register()
-    
-    return success
+    -- Initialize schema if needed
+    schema.init()
+  else
+    vim.notify("todo.nvim: Database URL not configured.", vim.log.levels.WARN)
+  end
+  
+  -- Set up plugin commands
+  commands.setup()
+  
+  -- Set up highlights
+  vim.cmd [[
+    highlight default link TodoHighPriority Error
+    highlight default link TodoMediumPriority WarningMsg
+    highlight default link TodoLowPriority Comment
+    highlight default link TodoCompleted Comment
+    highlight default link TodoDueDate String
+    highlight default link TodoOverdue Error
+    highlight default link TodoTags Identifier
+  ]]
 end
 
--- Open the todo UI
-function M.open()
-    require("todo.ui").open()
+-- Export API functions that will be used by commands
+M.open = function()
+  require("todo.ui").open()
 end
 
--- Add a new todo
-function M.add(text)
-    if not text or text == "" then
-        -- Open a prompt to add a new todo
-        vim.ui.input({ prompt = "Todo: " }, function(input)
-            if input and input ~= "" then
-                require("todo.db").add_todo(input)
-                vim.notify("Todo added", vim.log.levels.INFO)
-            end
-        end)
-    else
-        require("todo.db").add_todo(text)
-        vim.notify("Todo added", vim.log.levels.INFO)
-    end
+M.add = function(opts)
+  require("todo.ui").add_todo(opts)
 end
 
--- Complete a todo
-function M.complete(id)
-    if not id then
-        vim.notify("Todo ID required", vim.log.levels.ERROR)
-        return
-    end
-    
-    require("todo.db").complete_todo(id)
-    vim.notify("Todo completed", vim.log.levels.INFO)
+M.complete = function(id)
+  require("todo.db").complete_todo(id)
+  -- Refresh UI if open
+  if require("todo.ui").is_open() then
+    require("todo.ui").refresh()
+  end
 end
 
--- Show statistics
-function M.stats()
-    require("todo.ui").show_stats()
+M.delete = function(id)
+  require("todo.db").delete_todo(id)
+  -- Refresh UI if open
+  if require("todo.ui").is_open() then
+    require("todo.ui").refresh()
+  end
 end
 
--- Show overdue todos
-function M.overdue()
-    require("todo.ui").show_overdue()
-end
-
--- Show todos due today
-function M.today()
-    require("todo.ui").show_today()
+M.stats = function()
+  require("todo.stats").show()
 end
 
 return M

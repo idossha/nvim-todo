@@ -1,82 +1,142 @@
 local M = {}
 
--- Format a date string
-function M.format_date(date_str)
-    if not date_str then
-        return nil
+-- Parse a date string to a timestamp
+function M.parse_date(date_string)
+  if not date_string or date_string == "" then
+    return nil
+  end
+  
+  -- Try to parse YYYY-MM-DD format
+  local year, month, day = date_string:match("^(%d%d%d%d)%-(%d%d)%-(%d%d)$")
+  if year and month and day then
+    return os.time({
+      year = tonumber(year),
+      month = tonumber(month),
+      day = tonumber(day),
+      hour = 0,
+      min = 0,
+      sec = 0
+    })
+  end
+  
+  return nil
+end
+
+-- Format a timestamp as YYYY-MM-DD
+function M.format_date(timestamp)
+  if not timestamp then
+    return ""
+  end
+  
+  return os.date("%Y-%m-%d", timestamp)
+end
+
+-- Check if a date is in the past (overdue)
+function M.is_overdue(date_string)
+  local timestamp = M.parse_date(date_string)
+  if not timestamp then
+    return false
+  end
+  
+  local today = os.time({
+    year = os.date("%Y"),
+    month = os.date("%m"),
+    day = os.date("%d"),
+    hour = 0,
+    min = 0,
+    sec = 0
+  })
+  
+  return timestamp < today
+end
+
+-- Get a unique ID for a buffer
+function M.get_buf_id(buf)
+  return "todo_" .. buf
+end
+
+-- Escape a string for use in SQL
+function M.sql_escape(str)
+  if not str then
+    return "NULL"
+  end
+  
+  -- Replace single quotes with two single quotes
+  return "'" .. string.gsub(str, "'", "''") .. "'"
+end
+
+-- Convert a Lua table to a PostgreSQL array string
+function M.to_pg_array(tbl)
+  if not tbl or #tbl == 0 then
+    return "{}"
+  end
+  
+  local escaped = {}
+  for _, v in ipairs(tbl) do
+    table.insert(escaped, M.sql_escape(v))
+  end
+  
+  return "{" .. table.concat(escaped, ",") .. "}"
+end
+
+-- Convert a PostgreSQL array string to a Lua table
+function M.from_pg_array(arr_str)
+  if not arr_str or arr_str == "{}" then
+    return {}
+  end
+  
+  -- Remove the leading '{' and trailing '}'
+  local str = string.sub(arr_str, 2, -2)
+  
+  -- Split by commas that are not inside quotes
+  local result = {}
+  local current = ""
+  local in_quotes = false
+  
+  for i = 1, #str do
+    local char = string.sub(str, i, i)
+    
+    if char == "'" then
+      in_quotes = not in_quotes
+    elseif char == "," and not in_quotes then
+      table.insert(result, current)
+      current = ""
+    else
+      current = current .. char
     end
-    
-    -- Check if in YYYY-MM-DD format
-    local year, month, day = date_str:match("(%d%d%d%d)%-(%d%d)%-(%d%d)")
-    if year and month and day then
-        return string.format("%s-%s-%s", year, month, day)
+  end
+  
+  if current ~= "" then
+    table.insert(result, current)
+  end
+  
+  -- Remove quotes and unescape
+  for i, v in ipairs(result) do
+    if string.sub(v, 1, 1) == "'" and string.sub(v, -1) == "'" then
+      v = string.sub(v, 2, -2)
+      -- Unescape
+      v = string.gsub(v, "''", "'")
     end
-    
-    return date_str
+    result[i] = v
+  end
+  
+  return result
 end
 
--- Get today's date in YYYY-MM-DD format
-function M.today()
-    return os.date("%Y-%m-%d")
-end
-
--- Check if a date is in the past
-function M.is_date_past(date_str)
-    if not date_str then
-        return false
+-- Deep copy a table
+function M.deep_copy(orig)
+  local orig_type = type(orig)
+  local copy
+  if orig_type == 'table' then
+    copy = {}
+    for orig_key, orig_value in next, orig, nil do
+      copy[M.deep_copy(orig_key)] = M.deep_copy(orig_value)
     end
-    
-    local year, month, day = date_str:match("(%d%d%d%d)%-(%d%d)%-(%d%d)")
-    if not (year and month and day) then
-        return false
-    end
-    
-    local date = os.time({year = tonumber(year), month = tonumber(month), day = tonumber(day)})
-    local today = os.time({year = tonumber(os.date("%Y")), month = tonumber(os.date("%m")), day = tonumber(os.date("%d"))})
-    
-    return date < today
-end
-
--- Get a list of all tags from a todo text
-function M.extract_tags(text)
-    local tags = {}
-    for tag in text:gmatch("#([%w_-]+)") do
-        table.insert(tags, tag)
-    end
-    return tags
-end
-
--- Get the project from a todo text
-function M.extract_project(text)
-    return text:match("@([%w_-]+)")
-end
-
--- Get the due date from a todo text
-function M.extract_due_date(text)
-    return text:match("due:(%d%d%d%d%-%d%d%-%d%d)")
-end
-
--- Get the priority level from a todo text
-function M.extract_priority(text)
-    local priority_pattern = "^(!+)%s+"
-    local priority_match = text:match(priority_pattern)
-    
-    if priority_match then
-        return #priority_match -- 1 for medium, 2 for high
-    end
-    
-    return 0 -- Normal priority
-end
-
--- Clean up a todo text by removing metadata
-function M.clean_todo_text(text)
-    -- Remove priority markers
-    local cleaned = text:gsub("^(!+)%s+", "")
-    
-    -- We don't remove tags, projects or due dates as they are part of the text
-    -- Users may want to see them in the cleaned text as well
-    
-    return cleaned
+    setmetatable(copy, M.deep_copy(getmetatable(orig)))
+  else -- number, string, boolean, etc
+    copy = orig
+  end
+  return copy
 end
 
 return M

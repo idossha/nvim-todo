@@ -1,0 +1,178 @@
+*todo.txt*  Todo management for Neovim
+
+=====================================================================
+TODO.NVIM                                                   *todo-nvim*
+
+A lightweight and powerful Neovim plugin for managing todos directly 
+from your editor with PostgreSQL database integration.
+
+=====================================================================
+CONTENTS                                                *todo-contents*
+
+    1. Introduction .......................... |todo-introduction|
+    2. Requirements .......................... |todo-requirements|
+    3. Installation .......................... |todo-installation|
+    4. Configuration ......................... |todo-configuration|
+    5. Usage ................................ |todo-usage|
+    6. Commands ............................. |todo-commands|
+    7. Mappings ............................. |todo-mappings|
+    8. License .............................. |todo-license|
+
+=====================================================================
+1. Introduction                                     *todo-introduction*
+
+Todo.nvim is a plugin for Neovim that provides an intuitive interface
+for managing your todos. It stores todos in a PostgreSQL database using
+vim-dadbod, offering features like rich metadata (tags, projects, 
+priorities, due dates), statistics, and powerful search and filtering.
+
+=====================================================================
+2. Requirements                                     *todo-requirements*
+
+- Neovim >= 0.7.0
+- tpope/vim-dadbod (https://github.com/tpope/vim-dadbod)
+- A PostgreSQL database
+
+=====================================================================
+3. Installation                                     *todo-installation*
+
+Using packer.nvim:
+>lua
+    use {
+      'yourusername/todo.nvim',
+      requires = {
+        'tpope/vim-dadbod',
+        'nvim-lua/plenary.nvim',
+      },
+      config = function()
+        require('todo').setup({
+          -- Your configuration here
+        })
+      end
+    }
+<
+
+Using lazy.nvim:
+>lua
+    {
+      'yourusername/todo.nvim',
+      dependencies = {
+        'tpope/vim-dadbod',
+        'nvim-lua/plenary.nvim',
+      },
+      config = function()
+        require('todo').setup({
+          -- Your configuration here
+        })
+      end
+    }
+<
+
+Database Setup:
+1. Create a PostgreSQL database:
+>bash
+    createdb neovim_todos
+<
+
+2. Configure the plugin with your database connection in your Neovim
+   configuration file:
+>lua
+    require('todo').setup({
+      db = {
+        url = "postgresql://username:password@localhost/neovim_todos"
+      }
+    })
+<
+
+=====================================================================
+4. Configuration                                   *todo-configuration*
+
+Todo.nvim comes with sensible defaults, but you can customize it to
+your liking. Here's the default configuration:
+
+>lua
+    require('todo').setup({
+      db = {
+        url = nil, -- Database connection URL (REQUIRED)
+        check_connection = true, -- Check db connection on startup
+      },
+      ui = {
+        width = 60,        -- Width of the todo window
+        height = 20,       -- Height of the todo window
+        border = "rounded", -- Border style
+        highlight = {
+          priority_high = "TodoHighPriority",
+          priority_medium = "TodoMediumPriority",
+          priority_low = "TodoLowPriority",
+          completed = "TodoCompleted",
+          due_date = "TodoDueDate",
+          overdue = "TodoOverdue",
+          tags = "TodoTags",
+        },
+      },
+      mappings = {
+        add = "a",
+        delete = "d",
+        complete = "c",
+        edit = "e",
+        tags = "t",
+        priority = "p",
+        due_date = "D",
+        sort = "s",
+        filter = "f",
+        close = "q",
+        help = "?",
+      },
+    })
+<
+
+=====================================================================
+5. Usage                                                 *todo-usage*
+
+Basic workflow:
+1. Open the todo list with `:TodoOpen`
+2. Add new todos with 'a' in the list or `:TodoAdd`
+3. Complete todos with 'c' in the list or `:TodoComplete <id>`
+4. Filter and sort todos using 'f' and 's' in the todo window
+5. View statistics with `:TodoStats`
+
+=====================================================================
+6. Commands                                           *todo-commands*
+
+*:TodoOpen*
+    Open the todo list window
+
+*:TodoAdd* [title]
+    Add a new todo. If [title] is provided, it will be used as the
+    todo title. Otherwise, you'll be prompted for details.
+
+*:TodoComplete* <id>
+    Mark todo with the given ID as completed
+
+*:TodoDelete* <id>
+    Delete todo with the given ID
+
+*:TodoStats*
+    Show todo statistics
+
+=====================================================================
+7. Mappings                                           *todo-mappings*
+
+When the todo window is open, the following key mappings are available:
+
+a                   Add a new todo
+d                   Delete the todo under cursor
+c                   Complete the todo under cursor
+e                   Edit the todo under cursor
+t                   Add/edit tags
+p                   Set priority (H/M/L)
+D                   Set due date
+s                   Sort todos
+f                   Filter todos
+q                   Close window
+?                   Show help
+
+=====================================================================
+8. License                                             *todo-license*
+
+MIT License

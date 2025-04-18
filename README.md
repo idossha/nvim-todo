@@ -1,148 +1,167 @@
 # 📝 todo.nvim
 
-# 📝 todo.nvim
-
 A lightweight and powerful Neovim plugin for managing todos directly from your editor.
 
 ## Features
 
-- 🗃️ **Database-backed**: Store todos in an SQLite database for efficiency
 - 📋 **Intuitive UI**: Beautiful floating window interface for todo management
 - 🏷️ **Rich metadata**: Support for tags, projects, priorities, and due dates
 - 📊 **Statistics**: Track your productivity with built-in statistics
 - 🔍 **Search & Filter**: Easily find and filter todos by various criteria
 
+## Requirements
+
+- Neovim >= 0.7.0
+- [tpope/vim-dadbod](https://github.com/tpope/vim-dadbod) for database connection
+- PostgreSQL database
+
 ## Installation
 
-### Using [lazy.nvim](https://github.com/folke/lazy.nvim)
+### Plugin Installation
 
-```lua
-{
-    "idossha/todo.nvim",
-    config = function()
-        require("todo").setup()
-    end,
-    dependencies = {
-        "kkharji/sqlite.lua",
-    }
-}
-```
-
-### Using [packer.nvim](https://github.com/wbthomason/packer.nvim)
+Using [packer.nvim](https://github.com/wbthomason/packer.nvim):
 
 ```lua
 use {
-    "idossha/todo.nvim",
-    requires = {"kkharji/sqlite.lua"},
-    config = function()
-        require("todo").setup({
-            -- Optional configuration (see Configuration section)
-        })
-    end
+  'idossha/todo.nvim',
+  requires = {
+    'tpope/vim-dadbod',
+    'nvim-lua/plenary.nvim', -- For utilities
+  },
+  config = function()
+    require('todo').setup({
+      -- Your configuration here
+    })
+  end
 }
 ```
 
-## Dependencies
+Using [lazy.nvim](https://github.com/folke/lazy.nvim):
 
-This plugin works best with:
+```lua
+{
+  'idossha/todo.nvim',
+  dependencies = {
+    'tpope/vim-dadbod',
+    'nvim-lua/plenary.nvim',
+  },
+  config = function()
+    require('todo').setup({
+      -- Your configuration here
+    })
+  end
+}
+```
 
-- [sqlite.lua](https://github.com/kkharji/sqlite.lua) - Lua SQLite interface for Neovim
+### PostgreSQL Installation and Setup
 
-However, it will automatically fall back to using a JSON-based file storage if SQLite is not available, ensuring you can use the plugin without any external dependencies.
+#### macOS
 
-## Configuration
+1. Install PostgreSQL using Homebrew:
 
-Here's a sample configuration with the default values:
+```bash
+# Install PostgreSQL
+brew install postgresql@14
+
+# Start PostgreSQL service
+brew services start postgresql@14
+
+# Check your username
+whoami
+# This will output your macOS username, which you'll use in the connection string
+
+# Create the database for your todos
+createdb neovim_todos
+
+# If you get socket errors, you might need to add PostgreSQL to your PATH
+echo 'export PATH="/opt/homebrew/opt/postgresql@14/bin:$PATH"' >> ~/.zshrc
+source ~/.zshrc
+# Then try creating the database again
+createdb neovim_todos
+```
+
+#### Linux (Ubuntu/Debian)
+
+```bash
+# Install PostgreSQL
+sudo apt-get update
+sudo apt-get install postgresql postgresql-contrib
+
+# Start PostgreSQL service
+sudo systemctl start postgresql
+sudo systemctl enable postgresql
+
+# Switch to postgres user to create a user and database
+sudo -u postgres psql
+
+# In the PostgreSQL prompt, create a user and database
+postgres=# CREATE USER your_username WITH PASSWORD 'your_password';
+postgres=# CREATE DATABASE neovim_todos OWNER your_username;
+postgres=# \q
+
+# Test connection
+psql -U your_username -d neovim_todos
+```
+
+#### Windows
+
+1. Download and install PostgreSQL from the [official website](https://www.postgresql.org/download/windows/)
+2. During installation, set a password for the postgres user
+3. Use pgAdmin or the command line to create a new database named `neovim_todos`
+
+## Setup
+
+1. Configure the plugin with your database connection in your Neovim config:
 
 ```lua
 require('todo').setup({
-    -- Database configuration
-    db_path = vim.fn.expand("~/.local/share/nvim/todo.nvim/todo.db"),
+  db = {
+    -- For macOS with Homebrew (no password required for local connections)
+    url = "postgresql://yourusername@localhost/neovim_todos"
     
-    -- UI Settings
-    ui = {
-        width = 80,  -- Width of the floating window
-        height = 25,  -- Height of the floating window
-        border = "rounded",  -- Border style: "none", "single", "double", "rounded"
-        icons = true,  -- Use icons in the UI
-        mappings = {  -- Custom key mappings
-            open = "<leader>to",
-            add = "<leader>ta",
-            global_add = "<leader>ta"
-        }
-    }
+    -- For Linux/Windows or if you've set a password
+    -- url = "postgresql://username:password@localhost/neovim_todos"
+  },
+  ui = {
+    width = 60,        -- Width of the todo window
+    height = 20,       -- Height of the todo window
+    border = "rounded" -- Border style
+  },
+  mappings = {
+    -- Key mappings (see "Default Mappings" section)
+  }
 })
 ```
 
+2. Once configured, the plugin will automatically initialize the database schema when you first run `:TodoOpen`
+
+3. If you need to check if the database is properly connected, run `:TodoOpen` and check for any error notifications.
+
 ## Usage
 
-### Commands
+Default commands:
 
-| Command | Description |
-|---------|-------------|
-| `:TodoOpen` | Open the todo manager UI |
-| `:TodoAdd [text]` | Add a new todo |
-| `:TodoComplete [id]` | Complete a todo |
-| `:TodoOverdue` | Show overdue todos |
-| `:TodoToday` | Show todos due today |
-| `:TodoStats` | Show todo statistics |
+- `:TodoOpen` - Open the todo list window
+- `:TodoAdd` - Add a new todo
+- `:TodoComplete <id>` - Mark a todo as completed
+- `:TodoDelete <id>` - Delete a todo
+- `:TodoStats` - View productivity statistics
 
-### Default Keybindings
+## Default Mappings
 
-| Keybinding | Action |
-|------------|--------|
-| `<leader>ta` | Add a new todo |
-| `<leader>to` | Open todo manager |
+When the todo window is open:
 
-### Todo UI Keybindings
-
-| Key | Action |
-|-----|--------|
-| `j/k` | Navigate up/down |
-| `1` | Switch to active todos tab |
-| `2` | Switch to completed todos tab |
-| `3` | Switch to statistics tab |
-| `a` | Add new todo |
-| `c` | Complete selected todo |
-| `d` | Delete selected todo |
-| `e` | Edit selected todo |
-| `t` | Filter by tag |
-| `p` | Filter by project |
-| `s` | Search todos |
-| `r` | Refresh data |
-| `q` | Close window |
-| `?` | Toggle help |
-
-## Todo Syntax
-
-Todos support metadata through special syntax:
-
-- **Priority**: Start with `!` or `!!` for medium or high priority
-- **Tags**: Use `#tag` to add tags
-- **Project**: Use `@project` to assign to a project 
-- **Due date**: Use `due:YYYY-MM-DD` to set a due date
-
-Example: `!! Finish documentation #docs @blog due:2023-08-15`
-
-## Troubleshooting
-
-### SQLite Module
-
-The plugin works best with the Lua SQLite module (`sqlite.lua`), but will automatically fall back to JSON-based file storage if SQLite is not available. You'll see a notification like:
-
-```
-SQLite not available. Using file-based storage instead.
-```
-
-To get the best performance, install the SQLite dependency:
-
-```lua
-use { "kkharji/sqlite.lua" }
-```
-
-### Database errors
-
-If you encounter database-related errors, try deleting the database file (`~/.local/share/nvim/todo.nvim/todo.db` by default) and restarting Neovim. If using the fallback mode, you can also try deleting the JSON file at the same location (`~/.local/share/nvim/todo.nvim/todo.json`).
+- `a` - Add a new todo
+- `d` - Delete the todo under cursor
+- `c` - Complete the todo under cursor
+- `e` - Edit the todo under cursor
+- `t` - Add/edit tags
+- `p` - Set priority (H/M/L)
+- `D` - Set due date
+- `s` - Sort todos
+- `f` - Filter todos
+- `q` - Close window
+- `?` - Show help
 
 ## License
 

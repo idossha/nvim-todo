@@ -1,425 +1,710 @@
 local M = {}
+
 local api = vim.api
 local db = require("todo.db")
-local config = nil
+local utils = require("todo.utils")
+local config = require("todo").config
 
--- State variables
-local buf, win = nil, nil
-local current_tab = 1 -- 1: Active, 2: Completed, 3: Stats
-local current_todos = {}
-local selected_index = 1
-local show_help = false
+-- UI state
+M.state = {
+  buffer = nil,
+  window = nil,
+  todos = {},
+  filter = {
+    completed = false,
+    priority = nil,
+    project = nil,
+    tag = nil,
+    due_date = nil,
+  },
+  sort = {
+    field = "priority",
+    ascending = true,
+  },
+}
 
--- Get icons based on config
-local function get_icons()
-    if not config or not config.ui.icons then
-        return {
-            priority_low = " ",
-            priority_medium = "! ",
-            priority_high = "!! ",
-            checkbox_empty = "[ ] ",
-            checkbox_checked = "[x] ",
-            tab_active = "Active ",
-            tab_completed = "Completed ",
-            tab_stats = "Stats ",
-            due_date = "📅 ",
-            tag = "#",
-            project = "@"
-        }
-    else
-        return {
-            priority_low = " ",
-            priority_medium = "! ",
-            priority_high = "!! ",
-            checkbox_empty = "□ ",
-            checkbox_checked = "✓ ",
-            tab_active = "📋 Active ",
-            tab_completed = "✅ Completed ",
-            tab_stats = "📊 Stats ",
-            due_date = "📅 ",
-            tag = "#",
-            project = "@"
-        }
-    end
+-- Check if the UI is open
+function M.is_open()
+  return M.state.buffer ~= nil and api.nvim_buf_is_valid(M.state.buffer) and
+         M.state.window ~= nil and api.nvim_win_is_valid(M.state.window)
 end
 
--- Format todo item for display
-local function format_todo(todo)
-    local icons = get_icons()
-    local priority_icon = ""
-    
-    if todo.priority == 1 then
-        priority_icon = icons.priority_medium
-    elseif todo.priority == 2 then
-        priority_icon = icons.priority_high
-    else
-        priority_icon = icons.priority_low
-    end
-    
-    local checkbox = todo.is_completed == 1 and icons.checkbox_checked or icons.checkbox_empty
-    
-    local line = string.format("%s%s%s", checkbox, priority_icon, todo.text)
-    
-    -- Add due date if available
-    if todo.due_date then
-        local due_date = todo.due_date
-        line = line .. " " .. icons.due_date .. due_date
-    end
-    
-    return line
-end
-
--- Create a new scratch buffer
-local function create_buffer()
-    buf = api.nvim_create_buf(false, true)
-    api.nvim_buf_set_option(buf, "bufhidden", "wipe")
-    api.nvim_buf_set_option(buf, "filetype", "todo")
-    
-    -- Set buffer-local keymappings
-    local function set_keymap(key, cmd)
-        api.nvim_buf_set_keymap(buf, "n", key, cmd, { noremap = true, silent = true })
-    end
-    
-    set_keymap("j", ":lua require('todo.ui').move_cursor(1)<CR>")
-    set_keymap("k", ":lua require('todo.ui').move_cursor(-1)<CR>")
-    set_keymap("1", ":lua require('todo.ui').switch_tab(1)<CR>")
-    set_keymap("2", ":lua require('todo.ui').switch_tab(2)<CR>")
-    set_keymap("3", ":lua require('todo.ui').switch_tab(3)<CR>")
-    set_keymap("a", ":lua require('todo.ui').add_todo()<CR>")
-    set_keymap("c", ":lua require('todo.ui').complete_todo()<CR>")
-    set_keymap("d", ":lua require('todo.ui').delete_todo()<CR>")
-    set_keymap("e", ":lua require('todo.ui').edit_todo()<CR>")
-    set_keymap("t", ":lua require('todo.ui').filter_by_tag()<CR>")
-    set_keymap("p", ":lua require('todo.ui').filter_by_project()<CR>")
-    set_keymap("s", ":lua require('todo.ui').search_todos()<CR>")
-    set_keymap("r", ":lua require('todo.ui').refresh()<CR>")
-    set_keymap("q", ":lua require('todo.ui').close()<CR>")
-    set_keymap("?", ":lua require('todo.ui').toggle_help()<CR>")
-    
-    return buf
-end
-
--- Create a window with the given buffer
+-- Create the floating window for todos
 local function create_window()
-    local width = config.ui.width
-    local height = config.ui.height
-    local border = config.ui.border
-    
-    -- Calculate centered position
-    local ui = vim.api.nvim_list_uis()[1]
-    local win_width = math.min(width, ui.width)
-    local win_height = math.min(height, ui.height)
-    local row = math.floor((ui.height - win_height) / 2)
-    local col = math.floor((ui.width - win_width) / 2)
-    
-    -- Window options
-    local opts = {
-        relative = "editor",
-        width = win_width,
-        height = win_height,
-        row = row,
-        col = col,
-        style = "minimal",
-        border = border
-    }
-    
-    win = api.nvim_open_win(buf, true, opts)
-    api.nvim_win_set_option(win, "cursorline", true)
-    api.nvim_win_set_option(win, "wrap", true)
-    api.nvim_win_set_option(win, "winhl", "Normal:TodoNormal,FloatBorder:TodoBorder")
-    
-    return win
+  -- Create buffer if it doesn't exist
+  if not M.state.buffer or not api.nvim_buf_is_valid(M.state.buffer) then
+    M.state.buffer = api.nvim_create_buf(false, true)
+    api.nvim_buf_set_option(M.state.buffer, "bufhidden", "wipe")
+    api.nvim_buf_set_option(M.state.buffer, "filetype", "todo")
+  end
+  
+  -- Calculate window size and position
+  local width = config.ui.width
+  local height = config.ui.height
+  local row = math.floor((vim.o.lines - height) / 2)
+  local col = math.floor((vim.o.columns - width) / 2)
+  
+  -- Window options
+  local opts = {
+    relative = "editor",
+    width = width,
+    height = height,
+    row = row,
+    col = col,
+    style = "minimal",
+    border = config.ui.border,
+    title = " Todo List ",
+    title_pos = "center",
+  }
+  
+  -- Create window if it doesn't exist or is not valid
+  if not M.state.window or not api.nvim_win_is_valid(M.state.window) then
+    M.state.window = api.nvim_open_win(M.state.buffer, true, opts)
+    api.nvim_win_set_option(M.state.window, "winhighlight", "Normal:Normal,FloatBorder:FloatBorder")
+    api.nvim_win_set_option(M.state.window, "cursorline", true)
+  end
+  
+  -- Set buffer options
+  api.nvim_buf_set_option(M.state.buffer, "modifiable", false)
+  api.nvim_buf_set_option(M.state.buffer, "buftype", "nofile")
+  
+  -- Set up keybindings
+  local mappings = {
+    [config.mappings.add] = M.add_todo,
+    [config.mappings.delete] = M.delete_todo_under_cursor,
+    [config.mappings.complete] = M.complete_todo_under_cursor,
+    [config.mappings.edit] = M.edit_todo_under_cursor,
+    [config.mappings.tags] = M.edit_tags,
+    [config.mappings.priority] = M.set_priority,
+    [config.mappings.due_date] = M.set_due_date,
+    [config.mappings.sort] = M.show_sort_menu,
+    [config.mappings.filter] = M.show_filter_menu,
+    [config.mappings.close] = M.close,
+    [config.mappings.help] = M.show_help,
+  }
+  
+  for key, func in pairs(mappings) do
+    api.nvim_buf_set_keymap(M.state.buffer, "n", key, "", {
+      noremap = true,
+      silent = true,
+      callback = func,
+    })
+  end
 end
 
--- Render the UI content
-local function render()
-    if not buf then return end
-    
-    api.nvim_buf_set_option(buf, "modifiable", true)
-    
-    local lines = {}
-    local icons = get_icons()
-    
-    -- Add tabs
-    table.insert(lines, string.format(
-        "%s%s%s",
-        current_tab == 1 and "[" .. icons.tab_active .. "]" or icons.tab_active, 
-        current_tab == 2 and "[" .. icons.tab_completed .. "]" or icons.tab_completed,
-        current_tab == 3 and "[" .. icons.tab_stats .. "]" or icons.tab_stats
-    ))
-    table.insert(lines, string.rep("-", config.ui.width - 2))
-    
-    -- Add help if enabled
-    if show_help then
-        table.insert(lines, "Keybindings:")
-        table.insert(lines, "j/k: Navigate up/down   1/2/3: Switch tabs   a: Add todo")
-        table.insert(lines, "c: Complete todo        d: Delete todo       e: Edit todo")
-        table.insert(lines, "t: Filter by tag        p: Filter by project s: Search")
-        table.insert(lines, "r: Refresh              q: Close window      ?: Toggle help")
-        table.insert(lines, string.rep("-", config.ui.width - 2))
-    end
-    
-    -- Add content based on current tab
-    if current_tab == 1 or current_tab == 2 then
-        -- Active or Completed todos
-        if #current_todos == 0 then
-            table.insert(lines, "No todos found.")
-        else
-            for i, todo in ipairs(current_todos) do
-                table.insert(lines, format_todo(todo))
-            end
-        end
-    elseif current_tab == 3 then
-        -- Statistics
-        local stats = db.get_stats()
-        table.insert(lines, "📊 Todo Statistics:")
-        table.insert(lines, "")
-        table.insert(lines, string.format("Active todos: %d", stats.active))
-        table.insert(lines, string.format("Completed todos: %d", stats.completed))
-        table.insert(lines, string.format("Completed today: %d", stats.completed_today))
-        table.insert(lines, string.format("Overdue: %d", stats.overdue))
-        table.insert(lines, string.format("Due today: %d", stats.due_today))
-        table.insert(lines, "")
-        
-        if #stats.projects > 0 then
-            table.insert(lines, "Projects:")
-            for _, project in ipairs(stats.projects) do
-                table.insert(lines, "  @" .. project)
-            end
-            table.insert(lines, "")
-        end
-        
-        if #stats.tags > 0 then
-            table.insert(lines, "Tags:")
-            for _, tag in ipairs(stats.tags) do
-                table.insert(lines, "  #" .. tag)
-            end
-        end
-    end
-    
-    -- Set the lines in the buffer
-    api.nvim_buf_set_lines(buf, 0, -1, false, lines)
-    api.nvim_buf_set_option(buf, "modifiable", false)
-    
-    -- Set cursor position
-    if current_tab ~= 3 and #current_todos > 0 then
-        -- Add offset for header lines and ensure within bounds
-        local header_offset = 2 + (show_help and 6 or 0)
-        local cursor_line = math.min(header_offset + selected_index - 1, #lines)
-        api.nvim_win_set_cursor(win, {cursor_line, 0})
-    end
+-- Format a todo item for display
+local function format_todo(todo)
+  local status = todo.completed and "✓" or " "
+  local due = ""
+  
+  if todo.due_date and todo.due_date ~= "" then
+    local is_overdue = not todo.completed and os.time() > os.time(os.date("!*t", todo.due_date))
+    due = " [" .. os.date("%Y-%m-%d", todo.due_date) .. "]"
+  end
+  
+  local priority_marker = ""
+  if todo.priority == "H" then
+    priority_marker = "!"
+  elseif todo.priority == "M" then
+    priority_marker = "·"
+  end
+  
+  local tags = ""
+  if todo.tags and #todo.tags > 0 then
+    tags = " #" .. table.concat(todo.tags, " #")
+  end
+  
+  local project = ""
+  if todo.project and todo.project ~= "" then
+    project = " @" .. todo.project
+  end
+  
+  return string.format(
+    "[%s] %s %s%s%s%s", 
+    status, 
+    priority_marker, 
+    todo.title,
+    due,
+    project,
+    tags
+  ), todo.id
 end
 
--- Open the UI
+-- Render todos in the buffer
+local function render_todos()
+  if not M.is_open() then
+    return
+  end
+  
+  -- Clear buffer
+  api.nvim_buf_set_option(M.state.buffer, "modifiable", true)
+  api.nvim_buf_set_lines(M.state.buffer, 0, -1, false, {})
+  
+  -- Add header
+  local filter_active = M.state.filter.completed ~= nil or 
+                        M.state.filter.priority ~= nil or 
+                        M.state.filter.project ~= nil or
+                        M.state.filter.tag ~= nil or
+                        M.state.filter.due_date ~= nil
+  
+  local header = ""
+  if filter_active then
+    header = "Filter active | "
+  end
+  
+  header = header .. string.format(
+    "Sort: %s %s | %d todos", 
+    M.state.sort.field, 
+    M.state.sort.ascending and "↑" or "↓",
+    #M.state.todos
+  )
+  
+  api.nvim_buf_set_lines(M.state.buffer, 0, 0, false, {header, ""})
+  
+  -- Format and add todos
+  local lines = {}
+  local line_to_id = {}
+  
+  for i, todo in ipairs(M.state.todos) do
+    local line, id = format_todo(todo)
+    table.insert(lines, line)
+    line_to_id[i+2] = id  -- +2 for header lines
+  end
+  
+  -- Set formatted lines
+  api.nvim_buf_set_lines(M.state.buffer, 2, 2, false, lines)
+  api.nvim_buf_set_option(M.state.buffer, "modifiable", false)
+  
+  -- Store line to ID mapping in buffer variable
+  api.nvim_buf_set_var(M.state.buffer, "line_to_id", line_to_id)
+  
+  -- Apply syntax highlighting
+  local ns_id = api.nvim_create_namespace("TodoHighlight")
+  api.nvim_buf_clear_namespace(M.state.buffer, ns_id, 0, -1)
+  
+  for i, todo in ipairs(M.state.todos) do
+    local line_num = i + 2  -- +2 for header lines
+    local line = api.nvim_buf_get_lines(M.state.buffer, line_num-1, line_num, false)[1]
+    
+    -- Priority highlighting
+    if todo.priority == "H" then
+      api.nvim_buf_add_highlight(M.state.buffer, ns_id, config.ui.highlight.priority_high, line_num-1, 4, 5)
+    elseif todo.priority == "M" then
+      api.nvim_buf_add_highlight(M.state.buffer, ns_id, config.ui.highlight.priority_medium, line_num-1, 4, 5)
+    elseif todo.priority == "L" then
+      api.nvim_buf_add_highlight(M.state.buffer, ns_id, config.ui.highlight.priority_low, line_num-1, 4, 5)
+    end
+    
+    -- Completed task
+    if todo.completed then
+      api.nvim_buf_add_highlight(M.state.buffer, ns_id, config.ui.highlight.completed, line_num-1, 0, -1)
+    end
+    
+    -- Due date
+    if todo.due_date and todo.due_date ~= "" then
+      local due_start = line:find("%[%d%d%d%d%-%d%d%-%d%d%]")
+      if due_start then
+        local due_end = due_start + 11  -- [YYYY-MM-DD] is 12 chars
+        local highlight = config.ui.highlight.due_date
+        
+        -- Check if overdue
+        if not todo.completed and os.time() > os.time(os.date("!*t", todo.due_date)) then
+          highlight = config.ui.highlight.overdue
+        end
+        
+        api.nvim_buf_add_highlight(M.state.buffer, ns_id, highlight, line_num-1, due_start-1, due_end)
+      end
+    end
+    
+    -- Tags
+    local tag_start = line:find("#%w+")
+    while tag_start do
+      local tag_end = line:find("%s", tag_start) or #line + 1
+      api.nvim_buf_add_highlight(M.state.buffer, ns_id, config.ui.highlight.tags, line_num-1, tag_start-1, tag_end-1)
+      tag_start = line:find("#%w+", tag_end)
+    end
+  end
+end
+
+-- Load todos from the database
+local function load_todos()
+  local todos = db.get_todos(M.state.filter)
+  M.state.todos = todos or {}
+  
+  -- Apply current sort
+  table.sort(M.state.todos, function(a, b)
+    local field = M.state.sort.field
+    local asc = M.state.sort.ascending
+    
+    if field == "priority" then
+      local priority_value = {H = 1, M = 2, L = 3}
+      if asc then
+        return priority_value[a.priority] < priority_value[b.priority]
+      else
+        return priority_value[a.priority] > priority_value[b.priority]
+      end
+    elseif field == "due_date" then
+      if not a.due_date then return not asc end
+      if not b.due_date then return asc end
+      if asc then
+        return a.due_date < b.due_date
+      else
+        return a.due_date > b.due_date
+      end
+    elseif field == "created_at" then
+      if asc then
+        return a.created_at < b.created_at
+      else
+        return a.created_at > b.created_at
+      end
+    else -- Default to title
+      if asc then
+        return a.title < b.title
+      else
+        return a.title > b.title
+      end
+    end
+  end)
+  
+  render_todos()
+end
+
+-- Get todo ID under cursor
+local function get_todo_id_at_cursor()
+  if not M.is_open() then
+    return nil
+  end
+  
+  local line = api.nvim_win_get_cursor(M.state.window)[1]
+  local line_to_id = api.nvim_buf_get_var(M.state.buffer, "line_to_id")
+  
+  return line_to_id[line]
+end
+
+-- Open the todo window
 function M.open()
-    -- Load config
-    config = require("todo").config
-    
-    -- Create buffer and window if they don't exist
-    if not buf or not api.nvim_buf_is_valid(buf) then
-        buf = create_buffer()
-    end
-    
-    if not win or not api.nvim_win_is_valid(win) then
-        win = create_window()
-    end
-    
-    -- Set initial state
-    current_tab = 1
-    selected_index = 1
-    show_help = false
-    
-    -- Load active todos
-    current_todos = db.get_active_todos()
-    
-    -- Render the UI
-    render()
+  create_window()
+  load_todos()
 end
 
--- Close the UI
+-- Close the todo window
 function M.close()
-    if win and api.nvim_win_is_valid(win) then
-        api.nvim_win_close(win, true)
-        win = nil
-    end
+  if M.is_open() then
+    api.nvim_win_close(M.state.window, true)
+    M.state.window = nil
+    M.state.buffer = nil
+  end
 end
 
--- Move cursor up or down
-function M.move_cursor(direction)
-    if current_tab == 3 then return end
-    
-    selected_index = selected_index + direction
-    
-    -- Ensure within bounds
-    if selected_index < 1 then
-        selected_index = 1
-    elseif selected_index > #current_todos then
-        selected_index = #current_todos
-    end
-    
-    render()
-end
-
--- Switch between tabs
-function M.switch_tab(tab)
-    if tab < 1 or tab > 3 then return end
-    
-    current_tab = tab
-    selected_index = 1
-    
-    -- Load appropriate data
-    if tab == 1 then
-        current_todos = db.get_active_todos()
-    elseif tab == 2 then
-        current_todos = db.get_completed_todos()
-    end
-    
-    render()
-end
-
--- Toggle help display
-function M.toggle_help()
-    show_help = not show_help
-    render()
+-- Refresh the todo list
+function M.refresh()
+  load_todos()
 end
 
 -- Add a new todo
-function M.add_todo()
-    vim.ui.input({ prompt = "New todo: " }, function(input)
-        if input and input ~= "" then
-            db.add_todo(input)
-            M.refresh()
-        end
-    end)
-end
-
--- Complete the selected todo
-function M.complete_todo()
-    if current_tab ~= 1 or #current_todos == 0 then return end
-    
-    local todo = current_todos[selected_index]
-    if todo then
-        db.complete_todo(todo.id)
-        M.refresh()
+function M.add_todo(opts)
+  opts = opts or {}
+  
+  -- Create input fields
+  local title = opts.title
+  if not title then
+    title = vim.fn.input("Todo title: ")
+    if title == "" then
+      return
     end
-end
-
--- Delete the selected todo
-function M.delete_todo()
-    if #current_todos == 0 then return end
-    
-    local todo = current_todos[selected_index]
-    if todo then
-        db.delete_todo(todo.id)
-        M.refresh()
+  end
+  
+  local description = opts.description
+  if not description and not opts.skip_description then
+    description = vim.fn.input("Description (optional): ")
+  end
+  
+  local priority = opts.priority
+  if not priority and not opts.skip_priority then
+    priority = vim.fn.input("Priority (H/M/L) [M]: ")
+    if priority == "" then
+      priority = "M"
     end
-end
-
--- Edit the selected todo
-function M.edit_todo()
-    if #current_todos == 0 then return end
-    
-    local todo = current_todos[selected_index]
-    if todo then
-        vim.ui.input({ prompt = "Edit todo: ", default = todo.text }, function(input)
-            if input and input ~= "" then
-                db.update_todo(todo.id, input)
-                M.refresh()
-            end
-        end)
+    priority = string.upper(string.sub(priority, 1, 1))
+    if not (priority == "H" or priority == "M" or priority == "L") then
+      priority = "M"
     end
-end
-
--- Filter todos by tag
-function M.filter_by_tag()
-    if current_tab == 3 then return end
-    
-    vim.ui.input({ prompt = "Filter by tag: " }, function(input)
-        if input and input ~= "" then
-            current_todos = db.filter_by_tag(input)
-            selected_index = 1
-            render()
-        end
-    end)
-end
-
--- Filter todos by project
-function M.filter_by_project()
-    if current_tab == 3 then return end
-    
-    vim.ui.input({ prompt = "Filter by project: " }, function(input)
-        if input and input ~= "" then
-            current_todos = db.filter_by_project(input)
-            selected_index = 1
-            render()
-        end
-    end)
-end
-
--- Search todos
-function M.search_todos()
-    if current_tab == 3 then return end
-    
-    vim.ui.input({ prompt = "Search: " }, function(input)
-        if input and input ~= "" then
-            current_todos = db.search_todos(input)
-            selected_index = 1
-            render()
-        end
-    end)
-end
-
--- Refresh the current view
-function M.refresh()
-    if current_tab == 1 then
-        current_todos = db.get_active_todos()
-    elseif current_tab == 2 then
-        current_todos = db.get_completed_todos()
+  end
+  
+  local due_date = opts.due_date
+  if not due_date and not opts.skip_due_date then
+    due_date = vim.fn.input("Due date (YYYY-MM-DD, empty for none): ")
+    -- Validate date format
+    if due_date ~= "" and not due_date:match("^%d%d%d%d%-%d%d%-%d%d$") then
+      vim.notify("Invalid date format. Use YYYY-MM-DD", vim.log.levels.ERROR)
+      return
     end
-    
-    -- Ensure selected index is valid
-    if selected_index > #current_todos then
-        selected_index = math.max(1, #current_todos)
-    end
-    
-    render()
-end
-
--- Show overdue todos
-function M.show_overdue()
-    current_tab = 1
-    current_todos = db.get_overdue_todos()
-    selected_index = 1
-    
-    if not buf or not api.nvim_buf_is_valid(buf) then
-        M.open()
+  end
+  
+  local project = opts.project
+  if not project and not opts.skip_project then
+    project = vim.fn.input("Project (optional): ")
+  end
+  
+  local tags = opts.tags
+  if not tags and not opts.skip_tags then
+    local tags_input = vim.fn.input("Tags (comma separated): ")
+    if tags_input ~= "" then
+      tags = vim.split(tags_input, ",")
+      for i, tag in ipairs(tags) do
+        tags[i] = vim.trim(tag)
+      end
     else
-        render()
+      tags = {}
     end
+  end
+  
+  -- Create the todo
+  local todo = {
+    title = title,
+    description = description,
+    priority = priority,
+    due_date = due_date ~= "" and due_date or nil,
+    tags = tags,
+    project = project,
+  }
+  
+  -- Save to database
+  db.create_todo(todo)
+  
+  -- Refresh the view
+  M.refresh()
 end
 
--- Show todos due today
-function M.show_today()
-    current_tab = 1
-    current_todos = db.get_today_todos()
-    selected_index = 1
-    
-    if not buf or not api.nvim_buf_is_valid(buf) then
-        M.open()
-    else
-        render()
-    end
+-- Delete todo under cursor
+function M.delete_todo_under_cursor()
+  local id = get_todo_id_at_cursor()
+  if not id then
+    return
+  end
+  
+  local confirm = vim.fn.input("Delete todo? (y/N): ")
+  if confirm:lower() ~= "y" then
+    return
+  end
+  
+  db.delete_todo(id)
+  M.refresh()
 end
 
--- Show statistics
-function M.show_stats()
-    current_tab = 3
-    
-    if not buf or not api.nvim_buf_is_valid(buf) then
-        M.open()
-    else
-        render()
+-- Complete todo under cursor
+function M.complete_todo_under_cursor()
+  local id = get_todo_id_at_cursor()
+  if not id then
+    return
+  end
+  
+  db.complete_todo(id)
+  M.refresh()
+end
+
+-- Edit todo under cursor
+function M.edit_todo_under_cursor()
+  local id = get_todo_id_at_cursor()
+  if not id then
+    return
+  end
+  
+  local todo = db.get_todo(id)
+  if not todo then
+    vim.notify("Todo not found", vim.log.levels.ERROR)
+    return
+  end
+  
+  -- Edit fields
+  local title = vim.fn.input("Title [" .. todo.title .. "]: ")
+  if title == "" then
+    title = todo.title
+  end
+  
+  local description = vim.fn.input("Description [" .. (todo.description or "") .. "]: ")
+  if description == "" and todo.description then
+    description = todo.description
+  end
+  
+  local priority = vim.fn.input("Priority (H/M/L) [" .. todo.priority .. "]: ")
+  if priority == "" then
+    priority = todo.priority
+  else
+    priority = string.upper(string.sub(priority, 1, 1))
+    if not (priority == "H" or priority == "M" or priority == "L") then
+      priority = todo.priority
     end
+  end
+  
+  local due_date = vim.fn.input("Due date (YYYY-MM-DD) [" .. (todo.due_date or "") .. "]: ")
+  if due_date == "" and todo.due_date then
+    due_date = todo.due_date
+  end
+  
+  local project = vim.fn.input("Project [" .. (todo.project or "") .. "]: ")
+  if project == "" and todo.project then
+    project = todo.project
+  end
+  
+  -- Update todo
+  local updated_todo = {
+    title = title,
+    description = description,
+    priority = priority,
+    due_date = due_date ~= "" and due_date or nil,
+    project = project,
+  }
+  
+  db.update_todo(id, updated_todo)
+  M.refresh()
+end
+
+-- Edit tags for todo under cursor
+function M.edit_tags()
+  local id = get_todo_id_at_cursor()
+  if not id then
+    return
+  end
+  
+  local todo = db.get_todo(id)
+  if not todo then
+    vim.notify("Todo not found", vim.log.levels.ERROR)
+    return
+  end
+  
+  local tags_str = table.concat(todo.tags or {}, ", ")
+  local tags_input = vim.fn.input("Tags (comma separated) [" .. tags_str .. "]: ")
+  
+  local tags
+  if tags_input ~= "" then
+    tags = vim.split(tags_input, ",")
+    for i, tag in ipairs(tags) do
+      tags[i] = vim.trim(tag)
+    end
+  else
+    tags = todo.tags or {}
+  end
+  
+  db.update_todo(id, { tags = tags })
+  M.refresh()
+end
+
+-- Set priority for todo under cursor
+function M.set_priority()
+  local id = get_todo_id_at_cursor()
+  if not id then
+    return
+  end
+  
+  local priority = vim.fn.input("Priority (H/M/L): ")
+  if priority == "" then
+    return
+  end
+  
+  priority = string.upper(string.sub(priority, 1, 1))
+  if not (priority == "H" or priority == "M" or priority == "L") then
+    vim.notify("Invalid priority. Use H, M, or L", vim.log.levels.ERROR)
+    return
+  end
+  
+  db.update_todo(id, { priority = priority })
+  M.refresh()
+end
+
+-- Set due date for todo under cursor
+function M.set_due_date()
+  local id = get_todo_id_at_cursor()
+  if not id then
+    return
+  end
+  
+  local due_date = vim.fn.input("Due date (YYYY-MM-DD, empty for none): ")
+  if due_date ~= "" and not due_date:match("^%d%d%d%d%-%d%d%-%d%d$") then
+    vim.notify("Invalid date format. Use YYYY-MM-DD", vim.log.levels.ERROR)
+    return
+  end
+  
+  db.update_todo(id, { due_date = due_date })
+  M.refresh()
+end
+
+-- Show sort menu
+function M.show_sort_menu()
+  local sort_options = {
+    { key = "p", name = "Priority", field = "priority" },
+    { key = "d", name = "Due Date", field = "due_date" },
+    { key = "c", name = "Creation Date", field = "created_at" },
+    { key = "t", name = "Title", field = "title" },
+  }
+  
+  -- Display options
+  api.nvim_buf_set_option(M.state.buffer, "modifiable", true)
+  api.nvim_buf_set_lines(M.state.buffer, 0, -1, false, {
+    "--- Sort by ---",
+    "",
+  })
+  
+  local lines = {}
+  for _, option in ipairs(sort_options) do
+    local selected = M.state.sort.field == option.field
+    local direction = M.state.sort.ascending and "↑" or "↓"
+    local line = string.format("%s: %s %s", option.key, option.name, selected and direction or "")
+    table.insert(lines, line)
+  end
+  
+  table.insert(lines, "")
+  table.insert(lines, "r: Reverse order")
+  table.insert(lines, "")
+  table.insert(lines, "Press any key to sort, Esc to cancel")
+  
+  api.nvim_buf_set_lines(M.state.buffer, 2, 2, false, lines)
+  api.nvim_buf_set_option(M.state.buffer, "modifiable", false)
+  
+  -- Wait for keypress
+  local key = vim.fn.getchar()
+  
+  -- Convert to string
+  if type(key) == "number" then
+    key = vim.fn.nr2char(key)
+  end
+  
+  -- Handle key
+  if key == "\27" then -- Escape
+    -- Cancel, just refresh
+    M.refresh()
+    return
+  elseif key == "r" then
+    -- Reverse current sort
+    M.state.sort.ascending = not M.state.sort.ascending
+  else
+    -- Look for sort option
+    for _, option in ipairs(sort_options) do
+      if key == option.key then
+        if M.state.sort.field == option.field then
+          -- Toggle direction if same field
+          M.state.sort.ascending = not M.state.sort.ascending
+        else
+          -- Set new field with default direction
+          M.state.sort.field = option.field
+          M.state.sort.ascending = true
+        end
+        break
+      end
+    end
+  end
+  
+  -- Refresh with new sort
+  M.refresh()
+end
+
+-- Show filter menu
+function M.show_filter_menu()
+  local filter_options = {
+    { key = "a", name = "All", filter = { completed = nil } },
+    { key = "p", name = "Pending", filter = { completed = false } },
+    { key = "c", name = "Completed", filter = { completed = true } },
+    { key = "h", name = "High Priority", filter = { priority = "H", completed = false } },
+    { key = "m", name = "Medium Priority", filter = { priority = "M", completed = false } },
+    { key = "l", name = "Low Priority", filter = { priority = "L", completed = false } },
+    { key = "d", name = "Due Today", filter = { due_date = os.date("%Y-%m-%d"), completed = false } },
+    { key = "o", name = "Overdue", filter = { due_date = "<" .. os.date("%Y-%m-%d"), completed = false } },
+    { key = "t", name = "By Tag", filter = "tag_prompt" },
+    { key = "r", name = "By Project", filter = "project_prompt" },
+    { key = "z", name = "Clear Filters", filter = {} },
+  }
+  
+  -- Display options
+  api.nvim_buf_set_option(M.state.buffer, "modifiable", true)
+  api.nvim_buf_set_lines(M.state.buffer, 0, -1, false, {
+    "--- Filter ---",
+    ""
+  })
+  
+  local lines = {}
+  for _, option in ipairs(filter_options) do
+    local line = string.format("%s: %s", option.key, option.name)
+    table.insert(lines, line)
+  end
+  
+  table.insert(lines, "")
+  table.insert(lines, "Press a key to select filter, Esc to cancel")
+  
+  api.nvim_buf_set_lines(M.state.buffer, 2, 2, false, lines)
+  api.nvim_buf_set_option(M.state.buffer, "modifiable", false)
+  
+  -- Wait for keypress
+  local key = vim.fn.getchar()
+  
+  -- Convert to string
+  if type(key) == "number" then
+    key = vim.fn.nr2char(key)
+  end
+  
+  -- Handle key
+  if key == "\27" then -- Escape
+    -- Cancel, just refresh
+    M.refresh()
+    return
+  else
+    -- Look for filter option
+    for _, option in ipairs(filter_options) do
+      if key == option.key then
+        if option.filter == "tag_prompt" then
+          -- Prompt for tag
+          local tag = vim.fn.input("Filter by tag: ")
+          if tag ~= "" then
+            M.state.filter = { tag = tag, completed = false }
+          end
+        elseif option.filter == "project_prompt" then
+          -- Prompt for project
+          local project = vim.fn.input("Filter by project: ")
+          if project ~= "" then
+            M.state.filter = { project = project, completed = false }
+          end
+        else
+          -- Apply filter
+          M.state.filter = option.filter
+        end
+        break
+      end
+    end
+  end
+  
+  -- Refresh with new filter
+  M.refresh()
+end
+
+-- Show help
+function M.show_help()
+  local mappings = config.mappings
+  
+  -- Display help
+  api.nvim_buf_set_option(M.state.buffer, "modifiable", true)
+  api.nvim_buf_set_lines(M.state.buffer, 0, -1, false, {
+    "--- Todo.nvim Help ---",
+    "",
+    string.format("%s: Add new todo", mappings.add),
+    string.format("%s: Delete todo under cursor", mappings.delete),
+    string.format("%s: Complete todo under cursor", mappings.complete),
+    string.format("%s: Edit todo under cursor", mappings.edit),
+    string.format("%s: Edit tags", mappings.tags),
+    string.format("%s: Set priority", mappings.priority),
+    string.format("%s: Set due date", mappings.due_date),
+    string.format("%s: Sort todos", mappings.sort),
+    string.format("%s: Filter todos", mappings.filter),
+    string.format("%s: Close window", mappings.close),
+    string.format("%s: Show this help", mappings.help),
+    "",
+    "Press any key to continue"
+  })
+  api.nvim_buf_set_option(M.state.buffer, "modifiable", false)
+  
+  -- Wait for keypress
+  vim.fn.getchar()
+  
+  -- Refresh
+  M.refresh()
 end
 
 return M

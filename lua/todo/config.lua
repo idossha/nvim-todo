@@ -1,22 +1,43 @@
 local M = {}
 
--- Default configuration values
+-- Default configuration
 M.defaults = {
-    -- Database configuration
-    db_path = vim.fn.expand("~/.local/share/nvim/todo.nvim/todo.db"),
-    
-    -- UI Settings
-    ui = {
-        width = 80,        -- Width of the floating window
-        height = 25,       -- Height of the floating window
-        border = "rounded", -- Border style: "none", "single", "double", "rounded"
-        icons = true,      -- Use icons in the UI
-        mappings = {       -- Custom key mappings
-            open = "<leader>to",
-            add = "<leader>ta",
-            global_add = "<leader>ta"
-        }
-    }
+  db = {
+    url = nil, -- Database connection URL
+    check_connection = true, -- Check db connection on startup
+  },
+  ui = {
+    width = 60,        -- Width of the todo window
+    height = 20,       -- Height of the todo window
+    border = "rounded", -- Border style
+    highlight = {
+      priority_high = "TodoHighPriority",
+      priority_medium = "TodoMediumPriority",
+      priority_low = "TodoLowPriority",
+      completed = "TodoCompleted",
+      due_date = "TodoDueDate",
+      overdue = "TodoOverdue",
+      tags = "TodoTags",
+    },
+  },
+  mappings = {
+    add = "a",
+    delete = "d",
+    complete = "c",
+    edit = "e",
+    tags = "t",
+    priority = "p",
+    due_date = "D",
+    sort = "s",
+    filter = "f",
+    close = "q",
+    help = "?",
+  },
 }
+
+-- Update config with user options
+function M.update(opts)
+  return vim.tbl_deep_extend("force", M.defaults, opts or {})
+end
 
 return M
