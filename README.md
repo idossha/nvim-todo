@@ -40,6 +40,12 @@ use {
 }
 ```
 
+## Dependencies
+
+This plugin requires:
+
+- [sqlite.lua](https://github.com/kkharji/sqlite.lua) - Lua SQLite interface for Neovim
+
 ## Configuration
 
 Here's a sample configuration with the default values:
@@ -48,6 +54,7 @@ Here's a sample configuration with the default values:
 require('todo').setup({
     -- Database configuration
     db_path = vim.fn.expand("~/.local/share/nvim/todo.nvim/todo.db"),
+    
     -- UI Settings
     ui = {
         width = 80,  -- Width of the floating window
@@ -116,9 +123,11 @@ Example: `!! Finish documentation #docs @blog due:2023-08-15`
 ## Troubleshooting
 
 ### Missing SQLite
+
 The plugin requires the Lua SQLite module. If you see an error about SQLite, make sure you have installed `sqlite.lua` and that it's working correctly.
 
 ### Database errors
+
 If you encounter database-related errors, try deleting the database file (`~/.local/share/nvim/todo.nvim/todo.db` by default) and restarting Neovim.
 
 ## License

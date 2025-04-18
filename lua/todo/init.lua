@@ -1,145 +1,71 @@
--- Main plugin initialization
 local M = {}
 
--- Setup function to be called by user
-function M.setup(opts)
-    -- Load config first
-    local config = require('todo.config')
-    config.setup(opts)
+-- Default configuration
+local default_config = require("todo.config").defaults
+
+-- Plugin setup function
+function M.setup(user_config)
+    -- Merge user config with defaults
+    M.config = vim.tbl_deep_extend("force", default_config, user_config or {})
     
-    -- Then load other modules
-    local db = require('todo.db')
-    local ui = require('todo.ui')
-    local core = require('todo.core')
-    
-    -- Initialize database
-    if not db.setup() then
-        vim.notify("Failed to initialize database", vim.log.levels.ERROR)
-        return false
+    -- Ensure database directory exists
+    local db_dir = vim.fn.fnamemodify(M.config.db_path, ":h")
+    if vim.fn.isdirectory(db_dir) == 0 then
+        vim.fn.mkdir(db_dir, "p")
     end
     
-    -- Create commands
-    create_commands(core, ui)
+    -- Initialize the database
+    require("todo.db").init(M.config.db_path)
     
-    -- Set up keymaps
-    create_keymaps(config)
-    
-    return true
+    -- Register commands
+    require("todo.commands").register()
 end
 
--- Create commands when the plugin is loaded
-local function create_commands(core, ui)
-    -- Create user commands
-    vim.api.nvim_create_user_command('TodoAdd', function(args)
-        core.add_todo(table.concat(args.fargs, " "))
-    end, { nargs = '+', desc = 'Add a new todo item' })
-    
-    vim.api.nvim_create_user_command('TodoComplete', function()
-        ui.complete_todo_with_prompt()
-    end, { desc = 'Mark a todo item as complete' })
-    
-    vim.api.nvim_create_user_command('TodoList', core.open_todos, {
-        desc = 'Open active todo list'
-    })
-    
-    vim.api.nvim_create_user_command('TodoCompletedList', core.open_completed_todos, {
-        desc = 'Open completed todo list'
-    })
-    
-    vim.api.nvim_create_user_command('TodoStats', core.open_statistics, {
-        desc = 'Open todo statistics'
-    })
-    
-    vim.api.nvim_create_user_command('TodoFindFiles', core.find_todo_files, {
-        desc = 'Find files in todo directory'
-    })
-    
-    vim.api.nvim_create_user_command('TodoLiveGrep', core.live_grep_todos, {
-        desc = 'Live grep in todo directory'
-    })
-    
-    vim.api.nvim_create_user_command('TodoMigrateToDb', core.migrate_to_database, {
-        desc = 'Migrate todos from files to database'
-    })
-    
-    vim.api.nvim_create_user_command('TodoExportToFiles', core.export_database_to_files, {
-        desc = 'Export todos from database to files'
-    })
-    
-    vim.api.nvim_create_user_command('TodoToggleViewMode', core.toggle_view_mode, {
-        desc = 'Toggle between database and file view mode'
-    })
-    
-    vim.api.nvim_create_user_command('TodoSearch', function(args)
-        if args.fargs and #args.fargs > 0 then
-            local search_term = table.concat(args.fargs, " ")
-            core.search_todos(search_term)
-        else
-            ui.search_todos()
-        end
-    end, { nargs = '*', desc = 'Search todos by content' })
-    
-    vim.api.nvim_create_user_command('TodoDebug', core.debug_config, {
-        desc = 'Show debug information about todo plugin'
-    })
+-- Open the todo UI
+function M.open()
+    require("todo.ui").open()
 end
 
--- Set up default keymappings
-local function create_keymaps(config)
-    -- Set up keymappings
-    vim.api.nvim_set_keymap('n', '<leader>ta', ':TodoAdd ', 
-        { noremap = true, silent = false, desc = 'Add Todo' })
-    vim.api.nvim_set_keymap('n', '<leader>tc', ':TodoComplete<CR>', 
-        { noremap = true, silent = true, desc = 'Complete Todo' })
-    vim.api.nvim_set_keymap('n', '<leader>to', ':TodoList<CR>', 
-        { noremap = true, silent = true, desc = 'List Todos' })
-    vim.api.nvim_set_keymap('n', '<leader>th', ':TodoCompletedList<CR>', 
-        { noremap = true, silent = true, desc = 'List Completed Todos' })
-    vim.api.nvim_set_keymap('n', '<leader>ts', ':TodoStats<CR>', 
-        { noremap = true, silent = true, desc = 'Todo Statistics' })
-    vim.api.nvim_set_keymap('n', '<leader>tf', ':TodoFindFiles<CR>', 
-        { noremap = true, silent = true, desc = 'Find Todo Files' })
-    vim.api.nvim_set_keymap('n', '<leader>tg', ':TodoLiveGrep<CR>', 
-        { noremap = true, silent = true, desc = 'Live Grep Todos' })
-    vim.api.nvim_set_keymap('n', '<leader>ts', ':TodoSearch<CR>', 
-        { noremap = true, silent = true, desc = 'Search Todos' })
+-- Add a new todo
+function M.add(text)
+    if not text or text == "" then
+        -- Open a prompt to add a new todo
+        vim.ui.input({ prompt = "Todo: " }, function(input)
+            if input and input ~= "" then
+                require("todo.db").add_todo(input)
+                vim.notify("Todo added", vim.log.levels.INFO)
+            end
+        end)
+    else
+        require("todo.db").add_todo(text)
+        vim.notify("Todo added", vim.log.levels.INFO)
+    end
 end
 
--- Export functions for the public API
-function M.add_todo(...)
-    return require('todo.core').add_todo(...)
+-- Complete a todo
+function M.complete(id)
+    if not id then
+        vim.notify("Todo ID required", vim.log.levels.ERROR)
+        return
+    end
+    
+    require("todo.db").complete_todo(id)
+    vim.notify("Todo completed", vim.log.levels.INFO)
 end
 
-function M.complete_todo(...)
-    return require('todo.core').complete_todo(...)
+-- Show statistics
+function M.stats()
+    require("todo.ui").show_stats()
 end
 
-function M.delete_todo(...)
-    return require('todo.core').delete_todo(...)
+-- Show overdue todos
+function M.overdue()
+    require("todo.ui").show_overdue()
 end
 
-function M.show_statistics(...)
-    return require('todo.core').show_statistics(...)
+-- Show todos due today
+function M.today()
+    require("todo.ui").show_today()
 end
 
-function M.migrate_to_database(...)
-    return require('todo.core').migrate_to_database(...)
-end
-
-function M.export_database_to_files(...)
-    return require('todo.core').export_database_to_files(...)
-end
-
-function M.toggle_view_mode(...)
-    return require('todo.core').toggle_view_mode(...)
-end
-
-function M.search_todos(...)
-    return require('todo.core').search_todos(...)
-end
-
-function M.open_todo_ui(...)
-    return require('todo.ui').open(...)
-end
-
-return M 
+return M
