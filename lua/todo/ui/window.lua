@@ -118,6 +118,15 @@ function M.setup_keymaps(state)
     })
   end
 
+  -- Set up help keybind
+  api.nvim_buf_set_keymap(state.buffer, "n", "h", "", {
+    noremap = true,
+    silent = true,
+    callback = function()
+      require("todo.ui.actions").show_help()
+    end,
+  })
+
   -- Set up description preview
   api.nvim_create_autocmd("CursorMoved", {
     buffer = state.buffer,
@@ -129,37 +138,41 @@ function M.setup_keymaps(state)
       if id then
         local todo = require("todo.storage").get_todo(id)
         if todo and todo.description then
-          -- Show description in a floating window
-          local width = math.floor(vim.o.columns * 0.4)
-          local height = math.floor(vim.o.lines * 0.2)
-          local row = math.floor((vim.o.lines - height) / 2)
-          local col = math.floor((vim.o.columns - width) / 2)
+          -- Get current lines
+          local lines = api.nvim_buf_get_lines(state.buffer, 0, -1, false)
           
-          -- Create or update description window
-          if not state.desc_window or not api.nvim_win_is_valid(state.desc_window) then
-            state.desc_buffer = api.nvim_create_buf(false, true)
-            state.desc_window = api.nvim_open_win(state.desc_buffer, false, {
-              relative = "editor",
-              width = width,
-              height = height,
-              row = row,
-              col = col,
-              style = "minimal",
-              border = "rounded",
-              title = " Description ",
-              title_pos = "center",
-            })
+          -- Check if description is already shown
+          if not state.showing_description then
+            -- Insert description after the current line
+            table.insert(lines, line + 1, "  └─ " .. todo.description)
+            state.showing_description = true
+            state.description_line = line + 1
+          else
+            -- Update existing description
+            lines[state.description_line] = "  └─ " .. todo.description
           end
           
-          -- Update description content
-          api.nvim_buf_set_option(state.desc_buffer, "modifiable", true)
-          api.nvim_buf_set_lines(state.desc_buffer, 0, -1, false, {todo.description})
-          api.nvim_buf_set_option(state.desc_buffer, "modifiable", false)
-        elseif state.desc_window and api.nvim_win_is_valid(state.desc_window) then
-          -- Close description window if no description
-          api.nvim_win_close(state.desc_window, true)
-          state.desc_window = nil
-          state.desc_buffer = nil
+          -- Update buffer
+          api.nvim_buf_set_option(state.buffer, "modifiable", true)
+          api.nvim_buf_set_lines(state.buffer, 0, -1, false, lines)
+          api.nvim_buf_set_option(state.buffer, "modifiable", false)
+          
+          -- Add highlight for description
+          local ns_id = api.nvim_create_namespace("TodoDescription")
+          api.nvim_buf_clear_namespace(state.buffer, ns_id, 0, -1)
+          api.nvim_buf_add_highlight(state.buffer, ns_id, "Comment", state.description_line - 1, 0, -1)
+        elseif state.showing_description then
+          -- Remove description
+          local lines = api.nvim_buf_get_lines(state.buffer, 0, -1, false)
+          table.remove(lines, state.description_line)
+          
+          -- Update buffer
+          api.nvim_buf_set_option(state.buffer, "modifiable", true)
+          api.nvim_buf_set_lines(state.buffer, 0, -1, false, lines)
+          api.nvim_buf_set_option(state.buffer, "modifiable", false)
+          
+          state.showing_description = false
+          state.description_line = nil
         end
       end
     end,
