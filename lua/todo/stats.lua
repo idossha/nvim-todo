@@ -3,6 +3,8 @@ local M = {}
 local api = vim.api
 local storage = require("todo.storage")
 local config = require("todo").config
+local ui = require("todo.ui")
+
 
 -- State
 M.state = {

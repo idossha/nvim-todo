@@ -66,6 +66,7 @@ function M.setup(opts)
 end
 
 -- Export API functions that will be used by commands
+-- Export API functions that will be used by commands
 M.open = function()
   require("todo.ui").open()
 end
