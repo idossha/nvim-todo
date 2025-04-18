@@ -243,8 +243,6 @@ function M.get_stats()
   return stats
 end
 
-return M
-
 -- Check if database connection works
 function M.check_connection()
   local success, _ = pcall(execute_query, "SELECT 1")
