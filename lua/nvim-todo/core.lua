@@ -5,9 +5,19 @@ local config = require('nvim-todo.config')
 local db = require('nvim-todo.db')
 local files = require('nvim-todo.files')
 local stats = require('nvim-todo.stats')
-local ui = require('nvim-todo.ui')
 local migration = require('nvim-todo.migration')
 local utils = require('nvim-todo.utils')
+
+-- We'll load the UI module later to avoid circular dependencies
+local ui = nil
+
+-- Helper function to get UI module when needed
+local function get_ui()
+    if not ui then
+        ui = require('nvim-todo.ui')
+    end
+    return ui
+end
 
 -- Initialize the plugin with user config
 function M.setup(opts)
@@ -36,7 +46,7 @@ end
 function M.create_commands()
     -- Main UI commands
     vim.api.nvim_create_user_command('TodoOpen', function()
-        ui.open()
+        get_ui().open()
     end, { desc = 'Open Todo manager UI' })
     
     -- Add todo directly from command line
@@ -56,7 +66,7 @@ function M.create_commands()
                 vim.notify("Failed to add todo", vim.log.levels.ERROR)
             end
         else
-            ui.add_todo()
+            get_ui().add_todo()
         end
     end, { nargs = '*', desc = 'Add a new todo' })
     
@@ -76,25 +86,25 @@ function M.create_commands()
             end
         else
             -- Open UI to select a todo to complete
-            ui.open()
+            get_ui().open()
         end
     end, { nargs = '?', desc = 'Complete a todo' })
     
     -- Show all overdue todos
     vim.api.nvim_create_user_command('TodoOverdue', function()
         local today = utils.get_today()
-        ui.open({ due_before = today })
+        get_ui().open({ due_before = today })
     end, { desc = 'Show overdue todos' })
     
     -- Show todos due today
     vim.api.nvim_create_user_command('TodoToday', function()
         local today = utils.get_today()
-        ui.open({ due_today = today })
+        get_ui().open({ due_today = today })
     end, { desc = 'Show todos due today' })
     
     -- Show statistics
     vim.api.nvim_create_user_command('TodoStats', function()
-        ui.open_stats()
+        get_ui().open_stats()
     end, { desc = 'Show todo statistics' })
     
     -- Debug command
@@ -118,13 +128,13 @@ end
 
 -- Open the Todo UI
 function M.open_todo_ui()
-    ui.open()
+    get_ui().open()
 end
 
 -- Add a new todo with options
 function M.add_todo(content, options)
     if not content or content == "" then
-        ui.add_todo()
+        get_ui().add_todo()
         return
     end
     
@@ -177,17 +187,17 @@ end
 
 -- Open statistics view
 function M.show_statistics()
-    ui.open_stats()
+    get_ui().open_stats()
 end
 
 -- Open the active todos
 function M.open_todos()
-    return ui.open_todos()
+    return get_ui().open_todos()
 end
 
 -- Open the completed todos
 function M.open_completed_todos()
-    return ui.open_completed_todos()
+    return get_ui().open_completed_todos()
 end
 
 -- Open statistics view
@@ -216,12 +226,12 @@ end
 
 -- Find todo files
 function M.find_todo_files()
-    return ui.find_todo_files()
+    return get_ui().find_todo_files()
 end
 
 -- Live grep in todo files
 function M.live_grep_todos()
-    return ui.live_grep_todos()
+    return get_ui().live_grep_todos()
 end
 
 -- Toggle the view mode (database or files)
@@ -231,7 +241,7 @@ end
 
 -- Search todos
 function M.search_todos()
-    return ui.search_todos()
+    return get_ui().search_todos()
 end
 
 -- Migrate from files to database
@@ -250,16 +260,7 @@ end
 
 -- Export from database to files
 function M.export_database_to_files()
-    local config_values = config.get()
-    
-    -- Only proceed if we're using the database
-    if not config_values.use_database then
-        vim.notify("Database mode is not enabled in configuration", vim.log.levels.WARN)
-        return false
-    end
-    
-    -- Perform the export
-    return migration.export_from_db(config_values.db_path)
+    return migration.export_from_db(config.get().db_path)
 end
 
 return M

@@ -298,7 +298,7 @@ function M.add_todo(content, options)
             
             link_stmt:finalize()
         end
-    }
+    end
     
     if options.project then
         local todo_id = db:last_insert_rowid()
@@ -325,8 +325,8 @@ function M.add_todo(content, options)
             else
                 project_id = db:last_insert_rowid()
                 project_insert_stmt:finalize()
-            }
-        }
+            end
+        end
         
         -- Link todo to project
         if project_id then
@@ -339,9 +339,9 @@ function M.add_todo(content, options)
                 link_stmt:finalize()
             else
                 link_stmt:finalize()
-            }
-        }
-    }
+            end
+        end
+    end
     
     -- Commit or rollback based on success
     if success then
@@ -372,7 +372,7 @@ function M.complete_todo(todo_id)
     if success then
         -- Update statistics
         M.calculate_statistics()
-    }
+    end
     
     return success
 end
@@ -389,7 +389,7 @@ function M.delete_todo(todo_id)
     if success then
         -- Update statistics
         M.calculate_statistics()
-    }
+    end
     
     return success
 end
@@ -429,7 +429,7 @@ function M.update_todo(todo_id, updates)
     if success then
         -- Update statistics
         M.calculate_statistics()
-    }
+    end
     
     return success
 end

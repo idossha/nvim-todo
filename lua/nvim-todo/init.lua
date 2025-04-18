@@ -1,9 +1,34 @@
 -- Main plugin initialization
-local core = require('nvim-todo.core')
-local ui = require('nvim-todo.ui')
+local M = {}
+
+-- Setup function to be called by user
+function M.setup(opts)
+    -- Load config first
+    local config = require('nvim-todo.config')
+    config.setup(opts)
+    
+    -- Then load other modules
+    local db = require('nvim-todo.db')
+    local ui = require('nvim-todo.ui')
+    local core = require('nvim-todo.core')
+    
+    -- Initialize database
+    if not db.setup() then
+        vim.notify("Failed to initialize database", vim.log.levels.ERROR)
+        return false
+    end
+    
+    -- Create commands
+    create_commands(core, ui)
+    
+    -- Set up keymaps
+    create_keymaps(config)
+    
+    return true
+end
 
 -- Create commands when the plugin is loaded
-local function create_commands()
+local function create_commands(core, ui)
     -- Create user commands
     vim.api.nvim_create_user_command('TodoAdd', function(args)
         core.add_todo(table.concat(args.fargs, " "))
@@ -60,7 +85,7 @@ local function create_commands()
 end
 
 -- Set up default keymappings
-local function create_keymaps()
+local function create_keymaps(config)
     -- Set up keymappings
     vim.api.nvim_set_keymap('n', '<leader>ta', ':TodoAdd ', 
         { noremap = true, silent = false, desc = 'Add Todo' })
@@ -80,28 +105,41 @@ local function create_keymaps()
         { noremap = true, silent = true, desc = 'Search Todos' })
 end
 
--- Custom setup function
-local function setup(opts)
-    -- Initialize core functionality
-    core.setup(opts)
-    
-    -- Create commands and keymaps
-    create_commands()
-    create_keymaps()
+-- Export functions for the public API
+function M.add_todo(...)
+    return require('nvim-todo.core').add_todo(...)
 end
 
--- Return public API
-return {
-    setup = core.setup,
-    open = core.open_todo_ui,
-    add_todo = core.add_todo,
-    complete_todo = core.complete_todo,
-    delete_todo = core.delete_todo,
-    show_statistics = core.show_statistics,
-    
-    -- Database-specific functions
-    migrate_to_database = core.migrate_to_database,
-    export_database_to_files = core.export_database_to_files,
-    toggle_view_mode = core.toggle_view_mode,
-    search_todos = core.search_todos
-}
+function M.complete_todo(...)
+    return require('nvim-todo.core').complete_todo(...)
+end
+
+function M.delete_todo(...)
+    return require('nvim-todo.core').delete_todo(...)
+end
+
+function M.show_statistics(...)
+    return require('nvim-todo.core').show_statistics(...)
+end
+
+function M.migrate_to_database(...)
+    return require('nvim-todo.core').migrate_to_database(...)
+end
+
+function M.export_database_to_files(...)
+    return require('nvim-todo.core').export_database_to_files(...)
+end
+
+function M.toggle_view_mode(...)
+    return require('nvim-todo.core').toggle_view_mode(...)
+end
+
+function M.search_todos(...)
+    return require('nvim-todo.core').search_todos(...)
+end
+
+function M.open_todo_ui(...)
+    return require('nvim-todo.ui').open(...)
+end
+
+return M
