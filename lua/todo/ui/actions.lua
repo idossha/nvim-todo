@@ -367,28 +367,28 @@ function M.show_filter_menu()
     -- Cancel, just refresh
     ui.refresh()
     return
-  else
-    -- Look for filter option
-    for _, option in ipairs(filter_options) do
-      if key == option.key then
-        if option.filter == "tag_prompt" then
-          -- Prompt for tag
-          local tag = vim.fn.input("Filter by tag: ")
-          if tag ~= "" then
-            ui.state.filter = { tag = tag, completed = false }
-          end
-        elseif option.filter == "project_prompt" then
-          -- Prompt for project
-          local project = vim.fn.input("Filter by project: ")
-          if project ~= "" then
-            ui.state.filter = { project = project, completed = false }
-          end
-        else
-          -- Apply filter
-          ui.state.filter = option.filter
+  end
+  
+  -- Look for filter option
+  for _, option in ipairs(filter_options) do
+    if key == option.key then
+      if option.filter == "tag_prompt" then
+        -- Prompt for tag
+        local tag = vim.fn.input("Filter by tag: ")
+        if tag ~= "" then
+          ui.state.filter = { tag = tag, completed = false }
         end
-        break
+      elseif option.filter == "project_prompt" then
+        -- Prompt for project
+        local project = vim.fn.input("Filter by project: ")
+        if project ~= "" then
+          ui.state.filter = { project = project, completed = false }
+        end
+      else
+        -- Apply filter
+        ui.state.filter = option.filter
       end
+      break
     end
   end
   
