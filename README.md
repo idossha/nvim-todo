@@ -18,13 +18,10 @@ A lightweight and powerful Neovim plugin for managing todos directly from your e
 {
     "idossha/todo.nvim",
     config = function()
-        require("todo").setup({
-            -- Optional configuration (see Configuration section)
-        })
+        require("todo").setup()
     end,
     dependencies = {
-        -- Required dependencies
-        "kkharji/sqlite.lua", -- For SQLite database functionality
+        "kkharji/sqlite.lua",
     }
 }
 ```
