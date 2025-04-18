@@ -15,10 +15,12 @@ function M.setup(user_config)
     end
     
     -- Initialize the database
-    require("todo.db").init(M.config.db_path)
+    local success = require("todo.db").init(M.config.db_path)
     
     -- Register commands
     require("todo.commands").register()
+    
+    return success
 end
 
 -- Open the todo UI

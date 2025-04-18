@@ -1,5 +1,7 @@
 # 📝 todo.nvim
 
+# 📝 todo.nvim
+
 A lightweight and powerful Neovim plugin for managing todos directly from your editor.
 
 ## Features
@@ -42,9 +44,11 @@ use {
 
 ## Dependencies
 
-This plugin requires:
+This plugin works best with:
 
 - [sqlite.lua](https://github.com/kkharji/sqlite.lua) - Lua SQLite interface for Neovim
+
+However, it will automatically fall back to using a JSON-based file storage if SQLite is not available, ensuring you can use the plugin without any external dependencies.
 
 ## Configuration
 
@@ -122,13 +126,23 @@ Example: `!! Finish documentation #docs @blog due:2023-08-15`
 
 ## Troubleshooting
 
-### Missing SQLite
+### SQLite Module
 
-The plugin requires the Lua SQLite module. If you see an error about SQLite, make sure you have installed `sqlite.lua` and that it's working correctly.
+The plugin works best with the Lua SQLite module (`sqlite.lua`), but will automatically fall back to JSON-based file storage if SQLite is not available. You'll see a notification like:
+
+```
+SQLite not available. Using file-based storage instead.
+```
+
+To get the best performance, install the SQLite dependency:
+
+```lua
+use { "kkharji/sqlite.lua" }
+```
 
 ### Database errors
 
-If you encounter database-related errors, try deleting the database file (`~/.local/share/nvim/todo.nvim/todo.db` by default) and restarting Neovim.
+If you encounter database-related errors, try deleting the database file (`~/.local/share/nvim/todo.nvim/todo.db` by default) and restarting Neovim. If using the fallback mode, you can also try deleting the JSON file at the same location (`~/.local/share/nvim/todo.nvim/todo.json`).
 
 ## License
 
