@@ -1,6 +1,14 @@
 local M = {}
 local utils = require('nvim-todo.utils')
-local config_module = require('nvim-todo.config')
+local config_module
+
+-- Delay the loading of config_module to avoid circular dependency
+local function get_config()
+    if not config_module then
+        config_module = require('nvim-todo.config')
+    end
+    return config_module
+end
 
 -- Check if lsqlite3 is available
 local has_sqlite, sqlite = pcall(require, 'lsqlite3')
@@ -20,7 +28,7 @@ local function initialize_db()
         return true
     end
     
-    local config = config_module.get()
+    local config = get_config().get()
     
     -- Create the database connection
     local db = sqlite.open(config.db_path)
@@ -29,14 +37,17 @@ local function initialize_db()
         return false
     end
     
-    -- Create tables if they don't exist
+    -- Create tables if they don't exist with more fields for better organization
     local create_todos_table = [[
         CREATE TABLE IF NOT EXISTS todos (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             content TEXT NOT NULL,
             created_at TEXT NOT NULL,
             completed_at TEXT,
-            status TEXT NOT NULL DEFAULT 'active'
+            status TEXT NOT NULL DEFAULT 'active',
+            priority INTEGER DEFAULT 0,
+            due_date TEXT,
+            notes TEXT
         );
     ]]
     
@@ -73,12 +84,33 @@ local function initialize_db()
         );
     ]]
     
+    local create_projects_table = [[
+        CREATE TABLE IF NOT EXISTS projects (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT UNIQUE NOT NULL,
+            description TEXT,
+            created_at TEXT NOT NULL
+        );
+    ]]
+    
+    local create_todo_projects_table = [[
+        CREATE TABLE IF NOT EXISTS todo_projects (
+            todo_id INTEGER,
+            project_id INTEGER,
+            PRIMARY KEY (todo_id, project_id),
+            FOREIGN KEY (todo_id) REFERENCES todos(id) ON DELETE CASCADE,
+            FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+        );
+    ]]
+    
     local success = true
     success = success and db:exec(create_todos_table) == sqlite.OK
     success = success and db:exec(create_statistics_table) == sqlite.OK
     success = success and db:exec(create_settings_table) == sqlite.OK
     success = success and db:exec(create_tags_table) == sqlite.OK
     success = success and db:exec(create_todo_tags_table) == sqlite.OK
+    success = success and db:exec(create_projects_table) == sqlite.OK
+    success = success and db:exec(create_todo_projects_table) == sqlite.OK
     
     db:close()
     
@@ -93,7 +125,7 @@ end
 
 -- Execute SQL with parameters safely
 local function execute_query(query, params)
-    local config = config_module.get()
+    local config = get_config().get()
     local db = sqlite.open(config.db_path)
     if not db then
         vim.notify("Failed to open database", vim.log.levels.ERROR)
@@ -127,7 +159,7 @@ end
 
 -- Query data from the database
 local function query_data(query, params)
-    local config = config_module.get()
+    local config = get_config().get()
     local db = sqlite.open(config.db_path)
     if not db then
         vim.notify("Failed to open database", vim.log.levels.ERROR)
@@ -172,23 +204,29 @@ end
 -- Setup the database
 function M.setup()
     -- Initialize the database
-    return initialize_db()
+    if initialize_db() then
+        -- Update stats after initialization
+        M.calculate_statistics()
+        return true
+    end
+    return false
 end
 
 -- Add a new todo item
-function M.add_todo(content)
+function M.add_todo(content, options)
+    options = options or {}
     local timestamp = utils.generate_timestamp()
     
     local query = [[
-        INSERT INTO todos (content, created_at, status)
-        VALUES (?, ?, 'active');
+        INSERT INTO todos (content, created_at, status, priority, due_date, notes)
+        VALUES (?, ?, 'active', ?, ?, ?);
     ]]
     
     -- Extract tags from content
     local tags = utils.extract_tags(content)
     
     -- Begin transaction
-    local config = config_module.get()
+    local config = get_config().get()
     local db = sqlite.open(config.db_path)
     if not db then
         vim.notify("Failed to open database", vim.log.levels.ERROR)
@@ -209,6 +247,9 @@ function M.add_todo(content)
     
     todo_stmt:bind(1, content)
     todo_stmt:bind(2, timestamp)
+    todo_stmt:bind(3, options.priority or 0)
+    todo_stmt:bind(4, options.due_date or "")
+    todo_stmt:bind(5, options.notes or "")
     
     local success = todo_stmt:step() == sqlite.DONE
     todo_stmt:finalize()
@@ -257,11 +298,56 @@ function M.add_todo(content)
             
             link_stmt:finalize()
         end
-    end
+    }
+    
+    if options.project then
+        local todo_id = db:last_insert_rowid()
+        
+        -- Check if project exists
+        local project_check_stmt = db:prepare("SELECT id FROM projects WHERE name = ?")
+        project_check_stmt:bind(1, options.project)
+        
+        local project_id = nil
+        if project_check_stmt:step() == sqlite.ROW then
+            project_id = project_check_stmt:column_value(0)
+        end
+        project_check_stmt:finalize()
+        
+        -- If project doesn't exist, create it
+        if not project_id then
+            local project_insert_stmt = db:prepare("INSERT INTO projects (name, created_at) VALUES (?, ?)")
+            project_insert_stmt:bind(1, options.project)
+            project_insert_stmt:bind(2, timestamp)
+            
+            if project_insert_stmt:step() ~= sqlite.DONE then
+                success = false
+                project_insert_stmt:finalize()
+            else
+                project_id = db:last_insert_rowid()
+                project_insert_stmt:finalize()
+            }
+        }
+        
+        -- Link todo to project
+        if project_id then
+            local link_stmt = db:prepare("INSERT INTO todo_projects (todo_id, project_id) VALUES (?, ?)")
+            link_stmt:bind(1, todo_id)
+            link_stmt:bind(2, project_id)
+            
+            if link_stmt:step() ~= sqlite.DONE then
+                success = false
+                link_stmt:finalize()
+            else
+                link_stmt:finalize()
+            }
+        }
+    }
     
     -- Commit or rollback based on success
     if success then
         db:exec("COMMIT;")
+        -- Update statistics
+        M.calculate_statistics()
     else
         db:exec("ROLLBACK;")
     end
@@ -281,28 +367,188 @@ function M.complete_todo(todo_id)
         WHERE id = ? AND status = 'active';
     ]]
     
-    return execute_query(query, {timestamp, todo_id})
+    local success = execute_query(query, {timestamp, todo_id})
+    
+    if success then
+        -- Update statistics
+        M.calculate_statistics()
+    }
+    
+    return success
 end
 
--- Get all active todos
-function M.get_active_todos()
+-- Delete a todo item
+function M.delete_todo(todo_id)
     local query = [[
-        SELECT id, content, created_at
-        FROM todos
-        WHERE status = 'active'
-        ORDER BY created_at DESC;
+        DELETE FROM todos
+        WHERE id = ?;
+    ]]
+    
+    local success = execute_query(query, {todo_id})
+    
+    if success then
+        -- Update statistics
+        M.calculate_statistics()
+    }
+    
+    return success
+end
+
+-- Update a todo item
+function M.update_todo(todo_id, updates)
+    if not updates or vim.tbl_isempty(updates) then
+        return false
+    end
+    
+    -- Build the update query dynamically
+    local set_clauses = {}
+    local params = {}
+    
+    for field, value in pairs(updates) do
+        if field ~= "id" then -- Prevent updating the primary key
+            table.insert(set_clauses, field .. " = ?")
+            table.insert(params, value)
+        end
+    end
+    
+    if #set_clauses == 0 then
+        return false
+    end
+    
+    -- Add the todo_id to the params
+    table.insert(params, todo_id)
+    
+    local query = string.format([[
+        UPDATE todos
+        SET %s
+        WHERE id = ?;
+    ]], table.concat(set_clauses, ", "))
+    
+    local success = execute_query(query, params)
+    
+    if success then
+        -- Update statistics
+        M.calculate_statistics()
+    }
+    
+    return success
+end
+
+-- Get all active todos with optional filtering
+function M.get_active_todos(filters)
+    local query_parts = {
+        "SELECT t.id, t.content, t.created_at, t.priority, t.due_date, t.notes",
+        "FROM todos t",
+        "WHERE t.status = 'active'"
+    }
+    
+    local params = {}
+    
+    -- Process filters
+    if filters then
+        if filters.tag then
+            table.insert(query_parts, 2, "JOIN todo_tags tt ON t.id = tt.todo_id")
+            table.insert(query_parts, 3, "JOIN tags tg ON tt.tag_id = tg.id")
+            table.insert(query_parts, #query_parts + 1, "AND tg.name = ?")
+            table.insert(params, filters.tag)
+        end
+        
+        if filters.project then
+            table.insert(query_parts, 2, "JOIN todo_projects tp ON t.id = tp.todo_id")
+            table.insert(query_parts, 3, "JOIN projects p ON tp.project_id = p.id")
+            table.insert(query_parts, #query_parts + 1, "AND p.name = ?")
+            table.insert(params, filters.project)
+        end
+        
+        if filters.search then
+            table.insert(query_parts, #query_parts + 1, "AND t.content LIKE ?")
+            table.insert(params, '%' .. filters.search .. '%')
+        end
+        
+        if filters.priority then
+            table.insert(query_parts, #query_parts + 1, "AND t.priority >= ?")
+            table.insert(params, filters.priority)
+        end
+        
+        if filters.due_before then
+            table.insert(query_parts, #query_parts + 1, "AND t.due_date <= ? AND t.due_date != ''")
+            table.insert(params, filters.due_before)
+        end
+    }
+    
+    -- Add order clause
+    table.insert(query_parts, "ORDER BY CASE WHEN t.due_date = '' THEN 1 ELSE 0 END, t.due_date, t.priority DESC, t.created_at")
+    
+    local query = table.concat(query_parts, " ")
+    return query_data(query, params)
+end
+
+-- Get all completed todos with optional filtering
+function M.get_completed_todos(filters)
+    local query_parts = {
+        "SELECT t.id, t.content, t.created_at, t.completed_at, t.priority",
+        "FROM todos t",
+        "WHERE t.status = 'completed'"
+    }
+    
+    local params = {}
+    
+    -- Process filters
+    if filters then
+        if filters.tag then
+            table.insert(query_parts, 2, "JOIN todo_tags tt ON t.id = tt.todo_id")
+            table.insert(query_parts, 3, "JOIN tags tg ON tt.tag_id = tg.id")
+            table.insert(query_parts, #query_parts + 1, "AND tg.name = ?")
+            table.insert(params, filters.tag)
+        end
+        
+        if filters.project then
+            table.insert(query_parts, 2, "JOIN todo_projects tp ON t.id = tp.todo_id")
+            table.insert(query_parts, 3, "JOIN projects p ON tp.project_id = p.id")
+            table.insert(query_parts, #query_parts + 1, "AND p.name = ?")
+            table.insert(params, filters.project)
+        end
+        
+        if filters.search then
+            table.insert(query_parts, #query_parts + 1, "AND t.content LIKE ?")
+            table.insert(params, '%' .. filters.search .. '%')
+        end
+        
+        if filters.completed_after then
+            table.insert(query_parts, #query_parts + 1, "AND t.completed_at >= ?")
+            table.insert(params, filters.completed_after)
+        end
+    }
+    
+    -- Add order clause
+    table.insert(query_parts, "ORDER BY t.completed_at DESC")
+    
+    local query = table.concat(query_parts, " ")
+    return query_data(query, params)
+end
+
+-- Get all tags
+function M.get_tags()
+    local query = [[
+        SELECT t.id, t.name, COUNT(tt.todo_id) as todo_count
+        FROM tags t
+        LEFT JOIN todo_tags tt ON t.id = tt.tag_id
+        GROUP BY t.id
+        ORDER BY todo_count DESC, t.name
     ]]
     
     return query_data(query)
 end
 
--- Get all completed todos
-function M.get_completed_todos()
+-- Get all projects
+function M.get_projects()
     local query = [[
-        SELECT id, content, created_at, completed_at
-        FROM todos
-        WHERE status = 'completed'
-        ORDER BY completed_at DESC;
+        SELECT p.id, p.name, p.description, p.created_at, 
+               COUNT(tp.todo_id) as todo_count
+        FROM projects p
+        LEFT JOIN todo_projects tp ON p.id = tp.project_id
+        GROUP BY p.id
+        ORDER BY todo_count DESC, p.name
     ]]
     
     return query_data(query)
@@ -311,41 +557,99 @@ end
 -- Get todos by tag
 function M.get_todos_by_tag(tag)
     local query = [[
-        SELECT t.id, t.content, t.created_at, t.completed_at, t.status
+        SELECT t.id, t.content, t.created_at, t.completed_at, t.status, t.priority, t.due_date, t.notes
         FROM todos t
         JOIN todo_tags tt ON t.id = tt.todo_id
         JOIN tags tg ON tt.tag_id = tg.id
         WHERE tg.name = ?
         ORDER BY 
             CASE WHEN t.status = 'active' THEN 0 ELSE 1 END,
-            CASE WHEN t.status = 'active' THEN t.created_at ELSE t.completed_at END DESC;
+            CASE WHEN t.status = 'active' THEN 
+                CASE WHEN t.due_date = '' THEN 1 ELSE 0 END
+            ELSE 0 END,
+            CASE WHEN t.status = 'active' THEN 
+                CASE WHEN t.due_date = '' THEN t.priority ELSE t.due_date END
+            ELSE t.completed_at END DESC
     ]]
     
     return query_data(query, {tag})
 end
 
+-- Get todos by project
+function M.get_todos_by_project(project)
+    local query = [[
+        SELECT t.id, t.content, t.created_at, t.completed_at, t.status, t.priority, t.due_date, t.notes
+        FROM todos t
+        JOIN todo_projects tp ON t.id = tp.todo_id
+        JOIN projects p ON tp.project_id = p.id
+        WHERE p.name = ?
+        ORDER BY 
+            CASE WHEN t.status = 'active' THEN 0 ELSE 1 END,
+            CASE WHEN t.status = 'active' THEN 
+                CASE WHEN t.due_date = '' THEN 1 ELSE 0 END
+            ELSE 0 END,
+            CASE WHEN t.status = 'active' THEN 
+                CASE WHEN t.due_date = '' THEN t.priority ELSE t.due_date END
+            ELSE t.completed_at END DESC
+    ]]
+    
+    return query_data(query, {project})
+end
+
+-- Get tags for a todo
+function M.get_todo_tags(todo_id)
+    local query = [[
+        SELECT t.id, t.name
+        FROM tags t
+        JOIN todo_tags tt ON t.id = tt.tag_id
+        WHERE tt.todo_id = ?
+        ORDER BY t.name
+    ]]
+    
+    return query_data(query, {todo_id})
+end
+
 -- Search todos
 function M.search_todos(search_term)
     local query = [[
-        SELECT id, content, created_at, completed_at, status
+        SELECT id, content, created_at, completed_at, status, priority, due_date, notes
         FROM todos
         WHERE content LIKE ?
         ORDER BY 
             CASE WHEN status = 'active' THEN 0 ELSE 1 END,
-            CASE WHEN status = 'active' THEN created_at ELSE completed_at END DESC;
+            CASE WHEN status = 'active' THEN created_at ELSE completed_at END DESC
     ]]
     
     return query_data(query, {'%' .. search_term .. '%'})
 end
 
--- Calculate statistics
+-- Calculate statistics and store in the database
 function M.calculate_statistics()
     -- Query to get counts
     local counts_query = [[
         SELECT 
             (SELECT COUNT(*) FROM todos) as total_count,
             (SELECT COUNT(*) FROM todos WHERE status = 'active') as active_count,
-            (SELECT COUNT(*) FROM todos WHERE status = 'completed') as completed_count
+            (SELECT COUNT(*) FROM todos WHERE status = 'completed') as completed_count,
+            (SELECT COUNT(*) FROM tags) as tag_count,
+            (SELECT COUNT(*) FROM projects) as project_count
+    ]]
+    
+    -- Query to get today's completions
+    local today_query = [[
+        SELECT COUNT(*) as today_completed
+        FROM todos
+        WHERE status = 'completed' 
+        AND date(completed_at) = date('now', 'localtime')
+    ]]
+    
+    -- Query to get this week's completions
+    local week_query = [[
+        SELECT COUNT(*) as week_completed
+        FROM todos
+        WHERE status = 'completed' 
+        AND date(completed_at) >= date('now', 'weekday 0', '-7 days', 'localtime')
+        AND date(completed_at) <= date('now', 'localtime')
     ]]
     
     -- Query to get completion times
@@ -356,8 +660,14 @@ function M.calculate_statistics()
         WHERE status = 'completed'
     ]]
     
-    -- Get counts
+    -- Get basic counts
     local counts = query_data(counts_query)[1]
+    
+    -- Get today's completions
+    local today_completed = query_data(today_query)[1].today_completed
+    
+    -- Get this week's completions
+    local week_completed = query_data(week_query)[1].week_completed
     
     -- Get completion times
     local completion_times = query_data(completion_times_query)
@@ -395,14 +705,97 @@ function M.calculate_statistics()
         end
     end
     
+    -- Save all stats to the database
+    local timestamp = utils.generate_timestamp()
+    local config = get_config().get()
+    local db = sqlite.open(config.db_path)
+    
+    if not db then
+        return {
+            total_count = counts.total_count,
+            active_count = counts.active_count,
+            completed_count = counts.completed_count,
+            tag_count = counts.tag_count,
+            project_count = counts.project_count,
+            today_completed = today_completed,
+            week_completed = week_completed,
+            completion_rate = completion_rate,
+            avg_completion_time = avg_completion_time,
+            std_dev_completion_time = std_dev_completion_time
+        }
+    end
+    
+    -- Start transaction
+    db:exec("BEGIN TRANSACTION;")
+    
+    local function update_stat(metric, value)
+        local stmt = db:prepare([[
+            INSERT OR REPLACE INTO statistics (id, metric, value, updated_at)
+            SELECT 
+                (SELECT id FROM statistics WHERE metric = ?), 
+                ?, ?, ?
+        ]])
+        
+        if stmt then
+            stmt:bind(1, metric)
+            stmt:bind(2, metric)
+            stmt:bind(3, value)
+            stmt:bind(4, timestamp)
+            stmt:step()
+            stmt:finalize()
+        end
+    end
+    
+    update_stat("total_count", counts.total_count)
+    update_stat("active_count", counts.active_count)
+    update_stat("completed_count", counts.completed_count)
+    update_stat("tag_count", counts.tag_count)
+    update_stat("project_count", counts.project_count)
+    update_stat("today_completed", today_completed)
+    update_stat("week_completed", week_completed)
+    update_stat("completion_rate", completion_rate)
+    update_stat("avg_completion_time", avg_completion_time)
+    update_stat("std_dev_completion_time", std_dev_completion_time)
+    
+    -- Commit transaction
+    db:exec("COMMIT;")
+    db:close()
+    
     return {
         total_count = counts.total_count,
         active_count = counts.active_count,
         completed_count = counts.completed_count,
+        tag_count = counts.tag_count,
+        project_count = counts.project_count,
+        today_completed = today_completed,
+        week_completed = week_completed,
         completion_rate = completion_rate,
         avg_completion_time = avg_completion_time,
         std_dev_completion_time = std_dev_completion_time
     }
+end
+
+-- Get saved statistics
+function M.get_statistics()
+    local query = [[
+        SELECT metric, value
+        FROM statistics
+        ORDER BY metric
+    ]]
+    
+    local rows = query_data(query)
+    
+    local stats = {}
+    for _, row in ipairs(rows) do
+        stats[row.metric] = row.value
+    end
+    
+    -- If we have no stats, calculate them
+    if vim.tbl_isempty(stats) then
+        return M.calculate_statistics()
+    end
+    
+    return stats
 end
 
 return M

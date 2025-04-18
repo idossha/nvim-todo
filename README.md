@@ -1,29 +1,32 @@
 # Nvim Todo
 
-A powerful and flexible todo management plugin for Neovim with database support for data portability and a modular, maintainable codebase.
+A modern and interactive todo manager for Neovim with a beautiful UI and SQLite database storage.
 
 ## ✨ Features
 
-- 📝 Add, complete, and manage todos
-- 🔍 Telescope integration for searching and browsing
-- 📊 Automatic statistics tracking
-- 🕰️ Timestamped todos and completion tracking
-- 💾 SQLite database for data portability between machines
-- 🔄 Seamless migration between file and database storage
-- 🔖 Tag support for todo organization (#tag in todo text)
-- 🏗️ Modular, maintainable architecture
+- 🎨 Beautiful floating window UI
+- 💾 SQLite database for persistent storage
+- 📊 Real-time statistics and tracking
+- 🏷️ Tags and project support
+- 📅 Due dates and prioritization
+- 🔄 Instant synchronization between UI and database
+- ⌨️ Intuitive keyboard-driven interface
+
+## 📷 Screenshots
+
+![Nvim Todo UI](/screenshots/todo-ui.png)
+![Todo Stats](/screenshots/todo-stats.png)
 
 ## 🚧 Requirements
 
 - Neovim 0.7+
-- lsqlite3 Lua library (for database functionality)
-- (Optional) Telescope.nvim for enhanced search and browsing
+- lsqlite3 Lua library for database functionality
 
 ## 📦 Installation
 
 ### Installing SQLite Dependencies
 
-Before using the database features, you need to install the lsqlite3 Lua library:
+Before using the plugin, you need to install the lsqlite3 Lua library:
 
 #### On Ubuntu/Debian:
 ```bash
@@ -42,19 +45,21 @@ luarocks install lsqlite3
 ```lua
 {
     'idossha/nvim-todo',
-    dependencies = {
-        -- Optional: for enhanced search and browsing
-        'nvim-telescope/telescope.nvim'
-    },
     config = function()
         require('nvim-todo').setup({
-            -- Optional: customize todo directory
-            todo_dir = vim.fn.expand("~/.local/share/nvim/nvim-todo/files"),
-            -- Database settings
-            use_database = true,
+            -- Database location
             db_path = vim.fn.expand("~/.local/share/nvim/nvim-todo/todo.db"),
-            auto_migrate = true,
-            view_mode = "database" -- "database" or "files"
+            -- UI settings
+            ui = {
+                width = 80,  -- Width of the floating window
+                height = 25,  -- Height of the floating window
+                border = "rounded",  -- Border style
+                icons = true,  -- Use icons in the UI
+                mappings = {  -- Custom key mappings
+                    open = "<leader>to",
+                    add = "<leader>ta"
+                }
+            }
         })
     end
 }
@@ -65,19 +70,15 @@ luarocks install lsqlite3
 ```lua
 use {
     'idossha/nvim-todo',
-    requires = {
-        -- Optional: for enhanced search and browsing
-        'nvim-telescope/telescope.nvim'
-    },
     config = function()
         require('nvim-todo').setup({
             -- Optional: customize settings
-            todo_dir = vim.fn.expand("~/.local/share/nvim/nvim-todo/files"),
-            -- Database settings
-            use_database = true,
             db_path = vim.fn.expand("~/.local/share/nvim/nvim-todo/todo.db"),
-            auto_migrate = true,
-            view_mode = "database" -- "database" or "files"
+            ui = {
+                width = 80,
+                height = 25,
+                border = "rounded"
+            }
         })
     end
 }
@@ -85,115 +86,91 @@ use {
 
 ## 🎮 Usage
 
-### Basic Commands
+### Opening the UI
 
-- `:TodoAdd <task description>` - Add a new todo item
-- `:TodoComplete` - Mark a todo item as completed (with selection UI)
-- `:TodoList` - Open active todo list
-- `:TodoCompletedList` - Open completed todo list
-- `:TodoStats` - Open todo statistics
-- `:TodoFindFiles` - Find files in todo directory
-- `:TodoLiveGrep` - Live grep todos
-- `:TodoSearch` - Search todos with UI
+- Press `<leader>to` or run `:TodoOpen` to open the interactive UI
 
-### Database-specific Commands
+### Adding Todos
 
-- `:TodoMigrateToDb` - Migrate todos from files to database
-- `:TodoExportToFiles` - Export todos from database to files
-- `:TodoToggleViewMode` - Toggle between database and file view mode
-- `:TodoDebug` - Show debug information about configuration
+- Press `<leader>ta` or run `:TodoAdd` to add a new todo
+- From the UI: Press `a` to add a new todo
+- Syntax: `:TodoAdd Do something #tag @project due:2023-04-01`
+- Priority: Use `!` or `!!` prefix, e.g. `:TodoAdd ! Important task`
 
-### Keybindings
+### Working with Todos
 
-- `<leader>ta` - Add a new todo
-- `<leader>tc` - Complete a todo
-- `<leader>to` - Open todos
-- `<leader>th` - Open completed todos
-- `<leader>ts` - Open todo statistics
-- `<leader>tf` - Find todo files
-- `<leader>tg` - Live grep todos
-- `<leader>ts` - Search todos
+Within the Todo UI:
+- `j/k` - Navigate up/down
+- `c` - Complete selected todo
+- `d` - Delete selected todo
+- `e` - Edit selected todo
+- `1` - Switch to active todos
+- `2` - Switch to completed todos
+- `3` - Switch to statistics view
+- `t` - Filter by tag
+- `p` - Filter by project
+- `s` - Search todos
+- `r` - Refresh data
+- `?` - Toggle help
+- `q` - Close window
+
+### Commands
+
+- `:TodoOpen` - Open the Todo manager UI
+- `:TodoAdd [content]` - Add a new todo
+- `:TodoComplete [id]` - Complete a todo (opens UI if no ID provided)
+- `:TodoOverdue` - Show overdue todos
+- `:TodoToday` - Show todos due today
+- `:TodoStats` - Show todo statistics
+- `:TodoDebug` - Show debug information
 
 ## 🛠️ Configuration
 
 ```lua
 require('nvim-todo').setup({
-    -- File locations
-    todo_dir = "~/.local/share/nvim/nvim-todo/files",
-    active_todo_file = "todos.md",
-    completed_todo_file = "completed_todos.md",
-    statistics_file = "todo_stats.md",
-    
-    -- Telescope integration
-    use_telescope = true,  -- If telescope is available
-    
     -- Database settings
-    use_database = true,  -- Enable database functionality
-    db_path = "~/.local/share/nvim/nvim-todo/todo.db",  -- Path to SQLite database
+    db_path = "~/.local/share/nvim/nvim-todo/todo.db",
     
-    -- Migration settings
-    auto_migrate = true,  -- Automatically migrate from files to DB on startup
-    
-    -- View mode
-    view_mode = "database"  -- "database" or "files"
+    -- UI settings
+    ui = {
+        width = 80,             -- Width of the floating window
+        height = 25,            -- Height of the floating window
+        border = "rounded",     -- Border style: "none", "single", "double", "rounded"
+        icons = true,           -- Use icons in the UI
+        -- Custom key mappings
+        mappings = {
+            open = "<leader>to",
+            add = "<leader>ta"
+        }
+    }
 })
-```
-
-## 💾 Database Migration
-
-When you enable the database functionality for the first time, the plugin can automatically migrate your existing todos from Markdown files to the SQLite database. This ensures a smooth transition to the new storage system.
-
-You can also manually trigger migration:
-
-```
-:TodoMigrateToDb
-```
-
-To switch back to file view mode temporarily:
-
-```
-:TodoToggleViewMode
 ```
 
 ## 📋 Todo Format
 
-Todos support tagging with hashtags: `Do something #important #work`
+You can format your todos with various metadata:
 
-In the database, todos are stored with the following attributes:
-- ID (unique identifier)
-- Content (the text of the todo)
-- Created timestamp
-- Completed timestamp (if applicable)
-- Status (active or completed)
-- Tags (extracted from content)
+- **Tags**: `#tag1 #tag2` - Add tags for organization
+- **Projects**: `@project` - Assign to a project
+- **Priority**: 
+  - `! ` (one exclamation) - Medium priority
+  - `!! ` (two exclamations) - High priority 
+- **Due dates**: `due:YYYY-MM-DD` - Set a due date
 
-When viewing in the editor, todos appear as:
-- Active todos: `[ ] Task description (Created: timestamp)`
-- Completed todos: `[x] Task description (Created: timestamp) (Completed: timestamp)`
+Examples:
+- `Buy milk #shopping due:2023-04-01`
+- `!! Finish project report @work #urgent due:2023-03-15`
+- `! Read chapter 5 #book @learning`
 
-## 🔄 Data Portability
+## 📊 Statistics
 
-One of the key benefits of the SQLite database is data portability. To move your todos to another machine:
-
-1. Copy the database file (default location: `~/.local/share/nvim/nvim-todo/todo.db`)
-2. Place it in the same location on the target machine
-3. Ensure lsqlite3 is installed on the target machine
-
-The database contains all your todos, tags, and statistics, making the transition seamless.
-
-## 🏗️ Architecture
-
-The plugin uses a modular architecture for better maintainability:
-
-- `init.lua` - Main entry point, exports public API
-- `core.lua` - Core functionality and coordination
-- `config.lua` - Configuration management
-- `utils.lua` - Utility functions
-- `db.lua` - Database operations
-- `files.lua` - File-based storage operations
-- `ui.lua` - User interface components
-- `stats.lua` - Statistics calculations
-- `migration.lua` - Migration between storage systems
+The plugin automatically tracks:
+- Total number of todos
+- Active and completed counts
+- Completion rate
+- Tasks completed today and this week
+- Average completion time
+- Tags and project statistics
 
 ## 🤝 Contributing
 
