@@ -26,12 +26,12 @@ local function create_window()
   local col = math.floor((vim.o.columns - width) / 2)
   
   -- Create buffer
-  local buf = api.nvim_create_buf(false, true)
-  api.nvim_buf_set_option(buf, "bufhidden", "wipe")
-  api.nvim_buf_set_option(buf, "filetype", "todo_stats")
+  M.state.buffer = api.nvim_create_buf(false, true)
+  api.nvim_buf_set_option(M.state.buffer, "bufhidden", "wipe")
+  api.nvim_buf_set_option(M.state.buffer, "filetype", "todo_stats")
   
   -- Create window
-  local win = api.nvim_open_win(buf, true, {
+  M.state.window = api.nvim_open_win(M.state.buffer, true, {
     relative = "editor",
     width = width,
     height = height,
@@ -43,9 +43,18 @@ local function create_window()
     title_pos = "center",
   })
   
-  api.nvim_win_set_option(win, "winhighlight", "Normal:Normal,FloatBorder:FloatBorder")
+  api.nvim_win_set_option(M.state.window, "winhighlight", "Normal:Normal,FloatBorder:FloatBorder")
   
-  return buf, win
+  -- Set up keybindings
+  api.nvim_buf_set_keymap(M.state.buffer, "n", "q", "", {
+    noremap = true,
+    silent = true,
+    callback = function()
+      api.nvim_win_close(M.state.window, true)
+      M.state.window = nil
+      M.state.buffer = nil
+    end,
+  })
 end
 
 -- Render statistics
@@ -134,7 +143,14 @@ end
 
 -- Show statistics window
 function M.show()
-  local buf, win = create_window()
+  if is_open() then
+    api.nvim_win_close(M.state.window, true)
+    M.state.window = nil
+    M.state.buffer = nil
+    return
+  end
+  
+  create_window()
   render_stats()
 end
 
