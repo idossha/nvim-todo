@@ -2,6 +2,7 @@ local M = {}
 
 local api = vim.api
 local todo = require("todo")
+local config = require("todo").config
 
 -- Register all plugin commands
 function M.setup()
