@@ -4,6 +4,36 @@ local api = vim.api
 local config = require("todo").config
 local actions = require("todo.ui.actions")
 
+-- Function to update window size and position
+local function update_window_size(state)
+  if not state.window or not api.nvim_win_is_valid(state.window) then
+    return
+  end
+
+  local width = config.ui.width
+  local height = config.ui.height
+  
+  -- Convert percentages to actual dimensions
+  width = math.floor(vim.o.columns * width)
+  height = math.floor(vim.o.lines * height)
+  
+  local row = math.floor((vim.o.lines - height) / 2)
+  local col = math.floor((vim.o.columns - width) / 2)
+  
+  -- Update window options
+  api.nvim_win_set_config(state.window, {
+    relative = "editor",
+    width = width,
+    height = height,
+    row = row,
+    col = col,
+    style = "minimal",
+    border = config.ui.border,
+    title = " Todo List ",
+    title_pos = "center",
+  })
+end
+
 -- Create the floating window for todos
 function M.create(state)
   -- Create buffer if it doesn't exist
@@ -13,18 +43,9 @@ function M.create(state)
     api.nvim_buf_set_option(state.buffer, "filetype", "todo")
   end
   
-  -- Calculate window size and position
-  local width = config.ui.width
-  local height = config.ui.height
-  
-  -- Convert percentages to actual dimensions if needed
-  if width <= 1 then
-    width = math.floor(vim.o.columns * width)
-  end
-  if height <= 1 then
-    height = math.floor(vim.o.lines * height)
-  end
-  
+  -- Calculate initial window size and position
+  local width = math.floor(vim.o.columns * config.ui.width)
+  local height = math.floor(vim.o.lines * config.ui.height)
   local row = math.floor((vim.o.lines - height) / 2)
   local col = math.floor((vim.o.columns - width) / 2)
   
@@ -46,6 +67,15 @@ function M.create(state)
     state.window = api.nvim_open_win(state.buffer, true, opts)
     api.nvim_win_set_option(state.window, "winhighlight", "Normal:Normal,FloatBorder:FloatBorder")
     api.nvim_win_set_option(state.window, "cursorline", true)
+    
+    -- Create autocommand to handle window resizing
+    local group = api.nvim_create_augroup("TodoWindowResize", { clear = true })
+    api.nvim_create_autocmd("VimResized", {
+      group = group,
+      callback = function()
+        update_window_size(state)
+      end,
+    })
   end
   
   -- Set buffer options
@@ -79,6 +109,13 @@ function M.setup_keymaps(state)
       callback = func,
     })
   end
+
+  -- Ensure help is always available
+  api.nvim_buf_set_keymap(state.buffer, "n", "?", "", {
+    noremap = true,
+    silent = true,
+    callback = actions.show_help,
+  })
 end
 
 return M
