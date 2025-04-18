@@ -1,137 +1,123 @@
 local M = {}
 
--- Function to parse date string to timestamp
-local function parse_timestamp(date_str)
-    local year, month, day, hour, min, sec = 
-        date_str:match("(%d+)-(%d+)-(%d+) (%d+):(%d+):(%d+)")
-    return os.time{
-        year = tonumber(year),
-        month = tonumber(month),
-        day = tonumber(day),
-        hour = tonumber(hour),
-        min = tonumber(min),
-        sec = tonumber(sec)
+local utils = require('nvim-todo.utils')
+local config = require('nvim-todo.config')
+local files = require('nvim-todo.files')
+
+-- Parse todo files to get statistics
+local function calculate_file_stats()
+    local active_path = config.get_active_todo_path()
+    local completed_path = config.get_completed_todo_path()
+    
+    -- Parse todos from files
+    local active_todos = files.parse_todos(active_path)
+    local completed_todos = files.parse_todos(completed_path)
+    
+    -- Count todos
+    local active_count = #active_todos
+    local completed_count = #completed_todos
+    local total_count = active_count + completed_count
+    
+    -- Calculate completion rate
+    local completion_rate = 0
+    if total_count > 0 then
+        completion_rate = (completed_count / total_count) * 100
+    end
+    
+    -- Calculate completion time statistics
+    local completion_times = {}
+    for _, todo in ipairs(completed_todos) do
+        if todo.created_at and todo.completed_at then
+            -- Parse timestamps
+            local created_time = os.time({
+                year = todo.created_at:match("(%d+)%-(%d+)%-(%d+) (%d+):(%d+):(%d+)"),
+                month = todo.created_at:match("%d+%-(%d+)%-(%d+) (%d+):(%d+):(%d+)"),
+                day = todo.created_at:match("%d+%-%d+%-(%d+) (%d+):(%d+):(%d+)"),
+                hour = todo.created_at:match("%d+%-%d+%-%d+ (%d+):(%d+):(%d+)"),
+                min = todo.created_at:match("%d+%-%d+%-%d+ %d+:(%d+):(%d+)"),
+                sec = todo.created_at:match("%d+%-%d+%-%d+ %d+:%d+:(%d+)")
+            })
+            
+            local completed_time = os.time({
+                year = todo.completed_at:match("(%d+)%-(%d+)%-(%d+) (%d+):(%d+):(%d+)"),
+                month = todo.completed_at:match("%d+%-(%d+)%-(%d+) (%d+):(%d+):(%d+)"),
+                day = todo.completed_at:match("%d+%-%d+%-(%d+) (%d+):(%d+):(%d+)"),
+                hour = todo.completed_at:match("%d+%-%d+%-%d+ (%d+):(%d+):(%d+)"),
+                min = todo.completed_at:match("%d+%-%d+%-%d+ %d+:(%d+):(%d+)"),
+                sec = todo.completed_at:match("%d+%-%d+%-%d+ %d+:%d+:(%d+)")
+            })
+            
+            if created_time and completed_time then
+                -- Calculate difference in hours
+                local diff_hours = (completed_time - created_time) / 3600
+                table.insert(completion_times, diff_hours)
+            end
+        end
+    end
+    
+    -- Calculate average completion time
+    local avg_completion_time = 0
+    if #completion_times > 0 then
+        local sum = 0
+        for _, time in ipairs(completion_times) do
+            sum = sum + time
+        end
+        avg_completion_time = sum / #completion_times
+    end
+    
+    -- Calculate standard deviation
+    local std_dev_completion_time = 0
+    if #completion_times > 1 then
+        local variance = 0
+        for _, time in ipairs(completion_times) do
+            local diff = time - avg_completion_time
+            variance = variance + (diff * diff)
+        end
+        variance = variance / (#completion_times - 1)
+        std_dev_completion_time = math.sqrt(variance)
+    end
+    
+    return {
+        total_count = total_count,
+        active_count = active_count,
+        completed_count = completed_count,
+        completion_rate = completion_rate,
+        avg_completion_time = avg_completion_time,
+        std_dev_completion_time = std_dev_completion_time
     }
 end
 
--- Calculate completion statistics
-function M.calculate_todo_stats(active_path, completed_path)
-    -- Read file contents
-    local function read_file(path)
-        local file = io.open(path, "r")
-        if file then
-            local content = file:read("*all")
-            file:close()
-            return content
-        end
-        return nil
-    end
-
-    -- Improved function to extract todos with timestamps
-    local function extract_todos(content, is_completed)
-        local todos = {}
-        local pattern = is_completed and 
-            "^%- %[x%] (.-)%s*%(Created: (%d+-%d+-%d+ %d+:%d+:%d+)%)%s*%(Completed: (%d+-%d+-%d+ %d+:%d+:%d+)%)" or
-            "^%- %[ %] (.-)%s*%(Created: (%d+-%d+-%d+ %d+:%d+:%d+)%)"
-        
-        for line in content:gmatch("[^\r\n]+") do
-            local todo, create_time, complete_time = line:match(pattern)
-            if todo then
-                table.insert(todos, {
-                    text = todo,
-                    created = create_time,
-                    completed = complete_time,
-                    is_completed = is_completed
-                })
-            end
-        end
-        return todos
-    end
-
-    -- Read and extract todos from both files
-    local active_content = read_file(active_path) or ""
-    local completed_content = read_file(completed_path) or ""
+-- Format statistics data into a markdown string
+function M.format_statistics_content(stats)
+    local content = "# Todo Statistics\n\n"
     
-    local active_todos = extract_todos(active_content, false)
-    local completed_todos = extract_todos(completed_content, true)
+    -- Completion metrics
+    content = content .. "## Completion Metrics\n\n"
+    content = content .. string.format("- **Total Todos**: %d\n", stats.total_count)
+    content = content .. string.format("- **Active Todos**: %d\n", stats.active_count)
+    content = content .. string.format("- **Completed Todos**: %d\n", stats.completed_count)
+    content = content .. string.format("- **Completion Rate**: %.2f%%\n\n", stats.completion_rate)
     
-    -- Combine todos
-    local all_todos = {}
-    for _, todo in ipairs(active_todos) do table.insert(all_todos, todo) end
-    for _, todo in ipairs(completed_todos) do table.insert(all_todos, todo) end
-
-    -- Calculate completion times
-    local completion_times = {}
-    for _, todo in ipairs(all_todos) do
-        if todo.is_completed then
-            local create_timestamp = parse_timestamp(todo.created)
-            local complete_timestamp = parse_timestamp(todo.completed)
-            
-            -- Calculate completion time in hours
-            local completion_time = (complete_timestamp - create_timestamp) / 3600
-            table.insert(completion_times, completion_time)
-        end
-    end
-
-    -- Calculate statistics
-    local function calculate_stats(times)
-        if #times == 0 then return 0, 0 end
-        
-        -- Calculate mean
-        local sum = 0
-        for _, time in ipairs(times) do
-            sum = sum + time
-        end
-        local mean = sum / #times
-        
-        -- Calculate standard deviation
-        local variance_sum = 0
-        for _, time in ipairs(times) do
-            variance_sum = variance_sum + (time - mean)^2
-        end
-        local std_dev = math.sqrt(variance_sum / #times)
-        
-        return mean, std_dev
-    end
-
-    -- Count todos
-    local total_todos = #all_todos
-    local active_todo_count = #active_todos
-    local completed_todo_count = #completed_todos
-
-    -- Calculate mean and standard deviation
-    local mean_completion_time, std_dev_completion_time = calculate_stats(completion_times)
-
-    -- Prepare stats string
-    local stats_content = "# Todo Statistics\n\n"
-    stats_content = stats_content .. string.format("## Completion Metrics\n\n")
-    stats_content = stats_content .. string.format("- **Total Todos**: %d\n", total_todos)
-    stats_content = stats_content .. string.format("- **Active Todos**: %d\n", active_todo_count)
-    stats_content = stats_content .. string.format("- **Completed Todos**: %d\n", completed_todo_count)
+    -- Time analysis
+    content = content .. "## Completion Time Analysis\n\n"
+    content = content .. string.format("- **Mean Completion Time**: %.2f hours\n", stats.avg_completion_time)
+    content = content .. string.format("- **Std Deviation of Completion Time**: %.2f hours\n", stats.std_dev_completion_time)
     
-    -- Calculate completion percentage
-    local completion_percentage = total_todos > 0 and 
-        (completed_todo_count / total_todos) * 100 or 0
-    stats_content = stats_content .. string.format("- **Completion Rate**: %.2f%%\n\n", completion_percentage)
-    
-    stats_content = stats_content .. "## Completion Time Analysis\n\n"
-    stats_content = stats_content .. string.format("- **Mean Completion Time**: %.2f hours\n", mean_completion_time)
-    stats_content = stats_content .. string.format("- **Std Deviation of Completion Time**: %.2f hours\n", std_dev_completion_time)
-
-    return stats_content
+    return content
 end
 
--- Write statistics to file
-function M.update_statistics_file(active_path, completed_path, stats_path)
-    local stats_content = M.calculate_todo_stats(active_path, completed_path)
+-- Update the statistics file based on current todos
+function M.update_statistics_file()
+    local stats_path = config.get_statistics_path()
     
-    local file = io.open(stats_path, "w")
-    if file then
-        file:write(stats_content)
-        file:close()
-        return true
-    end
-    return false
+    -- Calculate statistics from files
+    local stats = calculate_file_stats()
+    
+    -- Generate and write statistics content
+    local content = M.format_statistics_content(stats)
+    utils.write_to_file(stats_path, content, "w")
+    
+    return true
 end
 
 return M
