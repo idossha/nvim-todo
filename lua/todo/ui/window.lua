@@ -17,6 +17,10 @@ local function update_window_size(state)
   width = math.floor(vim.o.columns * width)
   height = math.floor(vim.o.lines * height)
   
+  -- Ensure window doesn't cover the entire buffer
+  width = math.min(width, math.floor(vim.o.columns * 0.8))
+  height = math.min(height, math.floor(vim.o.lines * 0.8))
+  
   local row = math.floor((vim.o.lines - height) / 2)
   local col = math.floor((vim.o.columns - width) / 2)
   
@@ -46,6 +50,11 @@ function M.create(state)
   -- Calculate initial window size and position
   local width = math.floor(vim.o.columns * config.ui.width)
   local height = math.floor(vim.o.lines * config.ui.height)
+  
+  -- Ensure window doesn't cover the entire buffer
+  width = math.min(width, math.floor(vim.o.columns * 0.8))
+  height = math.min(height, math.floor(vim.o.lines * 0.8))
+  
   local row = math.floor((vim.o.lines - height) / 2)
   local col = math.floor((vim.o.columns - width) / 2)
   
@@ -109,6 +118,13 @@ function M.setup_keymaps(state)
       callback = func,
     })
   end
+
+  -- Ensure help is always available
+  api.nvim_buf_set_keymap(state.buffer, "n", "h", "", {
+    noremap = true,
+    silent = true,
+    callback = actions.show_help,
+  })
 end
 
 return M
