@@ -250,19 +250,6 @@ end
 function M.show_sort_menu()
   local state = require("todo.ui").get_state()
   
-  -- Display sort options
-  api.nvim_buf_set_option(state.buffer, "modifiable", true)
-  api.nvim_buf_set_lines(state.buffer, 0, -1, false, {
-    "--- Sort by ---",
-    "",
-    "1: Date " .. (state.current_sort == "Date" and (state.sort_ascending and "↑" or "↓") or ""),
-    "2: Priority " .. (state.current_sort == "Priority" and (state.sort_ascending and "↑" or "↓") or ""),
-    "3: Project " .. (state.current_sort == "Project" and (state.sort_ascending and "↑" or "↓") or ""),
-    "",
-    "Press a number to sort, Esc to cancel"
-  })
-  api.nvim_buf_set_option(state.buffer, "modifiable", false)
-  
   -- Wait for keypress
   local key = vim.fn.getchar()
   
@@ -271,17 +258,10 @@ function M.show_sort_menu()
     key = vim.fn.nr2char(key)
   end
   
-  -- Handle key
-  if key == "\27" then -- Escape
-    -- Cancel, just refresh
-    require("todo.ui").refresh()
-    return
-  end
-  
   local sort_options = {
-    ["1"] = "Date",
-    ["2"] = "Priority",
-    ["3"] = "Project"
+    ["d"] = "Date",
+    ["p"] = "Priority",
+    ["j"] = "Project"
   }
   
   if sort_options[key] then
@@ -293,29 +273,13 @@ function M.show_sort_menu()
       state.sort_ascending = true
     end
     state.last_sort = sort_options[key]
+    require("todo.ui").refresh()
   end
-  
-  require("todo.ui").refresh()
 end
 
 -- Show filter menu
 function M.show_filter_menu()
   local state = require("todo.ui").get_state()
-  
-  -- Display filter options
-  api.nvim_buf_set_option(state.buffer, "modifiable", true)
-  api.nvim_buf_set_lines(state.buffer, 0, -1, false, {
-    "--- Filter by ---",
-    "",
-    "1: Status",
-    "2: Tags",
-    "3: Project",
-    "4: Priority",
-    "5: Clear filters",
-    "",
-    "Press a number to filter, Esc to cancel"
-  })
-  api.nvim_buf_set_option(state.buffer, "modifiable", false)
   
   -- Wait for keypress
   local key = vim.fn.getchar()
@@ -325,23 +289,38 @@ function M.show_filter_menu()
     key = vim.fn.nr2char(key)
   end
   
-  -- Handle key
-  if key == "\27" then -- Escape
-    -- Cancel, just refresh
-    require("todo.ui").refresh()
-    return
+  -- Handle priority filter
+  if key == "p" then
+    -- Wait for priority keypress
+    local priority_key = vim.fn.getchar()
+    if type(priority_key) == "number" then
+      priority_key = vim.fn.nr2char(priority_key)
+    end
+    
+    local priority_options = {
+      ["h"] = "High",
+      ["m"] = "Medium",
+      ["l"] = "Low"
+    }
+    
+    if priority_options[priority_key] then
+      state.current_filter = "priority:" .. priority_options[priority_key]
+      require("todo.ui").refresh()
+    end
+  else
+    local filter_options = {
+      ["a"] = nil,  -- Show all
+      ["c"] = "completed",
+      ["o"] = "open",
+      ["t"] = "tags",
+      ["j"] = "project"
+    }
+    
+    if filter_options[key] then
+      state.current_filter = filter_options[key]
+      require("todo.ui").refresh()
+    end
   end
-  
-  local filter_options = {
-    ["1"] = "Status",
-    ["2"] = "Tags",
-    ["3"] = "Project",
-    ["4"] = "Priority",
-    ["5"] = nil
-  }
-  
-  state.current_filter = filter_options[key]
-  require("todo.ui").refresh()
 end
 
 -- Show help
