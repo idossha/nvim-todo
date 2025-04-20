@@ -153,53 +153,76 @@ function M.delete_todo(id)
   return false
 end
 
--- Get statistics
+-- Get statistics about todos
 function M.get_stats()
+  local todos = M.get_all_todos()
   local stats = {
-    total = #M.todos,
+    total = #todos,
     completed = 0,
-    pending = 0,
+    open = 0,
     high_priority = 0,
+    medium_priority = 0,
+    low_priority = 0,
     overdue = 0,
     completed_today = 0,
-    by_project = {},
-    by_tags = {}
+    completed_this_week = 0,
+    completed_this_month = 0,
   }
   
-  local today = os.date("%Y-%m-%d")
+  local now = os.time()
+  local today = os.date("*t", now)
+  today.hour = 0
+  today.min = 0
+  today.sec = 0
+  local today_start = os.time(today)
   
-  for _, todo in ipairs(M.todos) do
-    -- Count completed vs pending
+  for _, todo in ipairs(todos) do
     if todo.completed then
       stats.completed = stats.completed + 1
       
-      -- Check if completed today
-      if todo.completed_at and todo.completed_at:sub(1, 10) == today then
-        stats.completed_today = stats.completed_today + 1
+      -- Check completion time
+      if todo.completed_at then
+        local completed_time = type(todo.completed_at) == "number" and todo.completed_at or tonumber(todo.completed_at)
+        if completed_time then
+          local completed_date = os.date("*t", completed_time)
+          
+          -- Completed today
+          if completed_time >= today_start then
+            stats.completed_today = stats.completed_today + 1
+          end
+          
+          -- Completed this week
+          local week_start = today_start - (today.wday - 1) * 24 * 60 * 60
+          if completed_time >= week_start then
+            stats.completed_this_week = stats.completed_this_week + 1
+          end
+          
+          -- Completed this month
+          local month_start = os.time({year = today.year, month = today.month, day = 1})
+          if completed_time >= month_start then
+            stats.completed_this_month = stats.completed_this_month + 1
+          end
+        end
       end
     else
-      stats.pending = stats.pending + 1
+      stats.open = stats.open + 1
       
-      -- Count high priority
-      if todo.priority == "H" then
-        stats.high_priority = stats.high_priority + 1
-      end
-      
-      -- Count overdue
-      if todo.due_date and utils.is_overdue(todo.due_date) then
-        stats.overdue = stats.overdue + 1
+      -- Check if overdue
+      if todo.due_date then
+        local due_time = type(todo.due_date) == "number" and todo.due_date or tonumber(todo.due_date)
+        if due_time and due_time < now then
+          stats.overdue = stats.overdue + 1
+        end
       end
     end
     
-    -- Count by project
-    local project = todo.project or "(no project)"
-    stats.by_project[project] = (stats.by_project[project] or 0) + 1
-    
-    -- Count by tags
-    if todo.tags then
-      for _, tag in ipairs(todo.tags) do
-        stats.by_tags[tag] = (stats.by_tags[tag] or 0) + 1
-      end
+    -- Count priorities
+    if todo.priority == "H" then
+      stats.high_priority = stats.high_priority + 1
+    elseif todo.priority == "M" then
+      stats.medium_priority = stats.medium_priority + 1
+    elseif todo.priority == "L" then
+      stats.low_priority = stats.low_priority + 1
     end
   end
   
