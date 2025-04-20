@@ -26,10 +26,6 @@ function M.setup()
   vim.keymap.set("n", "<leader>ts", function()
     require("todo").stats()
   end, { desc = "Show todo statistics" })
-
-  vim.keymap.set("n", "<leader>th", function()
-    require("todo.ui").open({ show_completed = true, is_history = true })
-  end, { desc = "Show completed tasks history" })
   
   api.nvim_create_user_command("TodoAdd", function(opts)
     local args = opts.args

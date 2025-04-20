@@ -33,7 +33,7 @@ local function update_window_size(state)
     col = col,
     style = "minimal",
     border = config.ui.border,
-    title = state.is_history and " Completed Tasks History " or " Todo List ",
+    title = get_window_title(state),
     title_pos = "center",
   })
 end
@@ -67,7 +67,7 @@ function M.create(state)
     col = col,
     style = "minimal",
     border = config.ui.border,
-    title = state.is_history and " Completed Tasks History " or " Todo List ",
+    title = get_window_title(state),
     title_pos = "center",
   }
   
@@ -95,30 +95,47 @@ function M.create(state)
   M.setup_keymaps(state)
 end
 
+-- Helper function to get window title based on current state
+local function get_window_title(state)
+  local title = " Todo List "
+  if state.current_filter then
+    title = title .. "| Filtered: " .. state.current_filter
+  end
+  if state.current_sort then
+    title = title .. " | Sorted: " .. state.current_sort
+  end
+  return title
+end
+
 -- Set up keybindings for the window
 function M.setup_keymaps(state)
   local mappings = {
+    [config.mappings.add] = actions.add_todo,
     [config.mappings.delete] = actions.delete_todo_under_cursor,
+    [config.mappings.complete] = actions.complete_todo_under_cursor,
+    [config.mappings.edit] = actions.edit_todo_under_cursor,
+    [config.mappings.tags] = actions.edit_tags,
+    [config.mappings.priority] = actions.set_priority,
+    [config.mappings.due_date] = actions.set_due_date,
+    [config.mappings.sort] = actions.show_sort_menu,
+    [config.mappings.filter] = actions.show_filter_menu,
     [config.mappings.close] = function() require("todo.ui").close() end,
   }
-  
-  -- Only add these mappings for the main todo window (not history)
-  if not state.is_history then
-    mappings[config.mappings.add] = actions.add_todo
-    mappings[config.mappings.complete] = actions.complete_todo_under_cursor
-    mappings[config.mappings.edit] = actions.edit_todo_under_cursor
-    mappings[config.mappings.tags] = actions.edit_tags
-    mappings[config.mappings.priority] = actions.set_priority
-    mappings[config.mappings.due_date] = actions.set_due_date
-    mappings[config.mappings.sort] = actions.show_sort_menu
-    mappings[config.mappings.filter] = actions.show_filter_menu
-  end
   
   for key, func in pairs(mappings) do
     api.nvim_buf_set_keymap(state.buffer, "n", key, "", {
       noremap = true,
       silent = true,
-      callback = func,
+      callback = function()
+        func()
+        -- Update window title after filter/sort changes
+        if key == config.mappings.sort or key == config.mappings.filter then
+          api.nvim_win_set_config(state.window, {
+            title = get_window_title(state),
+            title_pos = "center",
+          })
+        end
+      end,
     })
   end
 
@@ -143,26 +160,33 @@ function M.setup_keymaps(state)
       else
         -- Add help section
         local help_lines = {
-          "╭───────────────────────────────╮",
-          "│        Todo Commands          │",
-          "├───────────────────────────────┤",
-          "│  a  │ Add new todo            │",
-          "│  d  │ Delete todo             │",
-          "│  c  │ Complete todo           │",
-          "│  e  │ Edit todo               │",
-          "│  t  │ Edit tags               │",
-          "│  p  │ Set priority (H/M/L)    │",
-          "│  D  │ Set due date            │",
-          "│  s  │ Sort todos              │",
-          "│  f  │ Filter todos            │",
-          "│  q  │ Close window            │",
-          "│  h  │ Toggle help             │",
-          "├───────────────────────────────┤",
-          "│ <leader>to │ Open todo list   │",
-          "│ <leader>ta │ Add new todo     │",
-          "│ <leader>ts │ Show statistics  │",
-          "│ <leader>th │ Show completed   │",
-          "╰───────────────────────────────╯"
+          "╭───────────────────────────────────────────────╮",
+          "│              Todo Commands                    │",
+          "├───────────────────────────────────────────────┤",
+          "│  a  │ Add new todo                           │",
+          "│  d  │ Delete todo                            │",
+          "│  c  │ Complete todo                          │",
+          "│  e  │ Edit todo                              │",
+          "│  t  │ Edit tags                              │",
+          "│  p  │ Set priority (H/M/L)                   │",
+          "│  D  │ Set due date                           │",
+          "│  s  │ Sort todos:                            │",
+          "│     │  1. By date (created/due)              │",
+          "│     │  2. By priority (H/M/L)                │",
+          "│     │  3. By project                         │",
+          "│  f  │ Filter todos:                          │",
+          "│     │  1. By status (open/completed)         │",
+          "│     │  2. By tags                            │",
+          "│     │  3. By project                         │",
+          "│     │  4. By priority                        │",
+          "│     │  5. Clear filters                      │",
+          "│  q  │ Close window                           │",
+          "│  h  │ Toggle help                            │",
+          "├───────────────────────────────────────────────┤",
+          "│ <leader>to │ Open todo list                  │",
+          "│ <leader>ta │ Add new todo                    │",
+          "│ <leader>ts │ Show statistics                 │",
+          "╰───────────────────────────────────────────────╯"
         }
         
         -- Insert help section at the top
@@ -188,14 +212,16 @@ function M.setup_keymaps(state)
         -- Highlight borders and headers
         api.nvim_buf_add_highlight(state.buffer, ns_id, "TodoHelpBorder", 0, 0, -1)
         api.nvim_buf_add_highlight(state.buffer, ns_id, "TodoHelpBorder", 2, 0, -1)
-        api.nvim_buf_add_highlight(state.buffer, ns_id, "TodoHelpBorder", 13, 0, -1)
-        api.nvim_buf_add_highlight(state.buffer, ns_id, "TodoHelpBorder", 18, 0, -1)
+        api.nvim_buf_add_highlight(state.buffer, ns_id, "TodoHelpBorder", 21, 0, -1)
+        api.nvim_buf_add_highlight(state.buffer, ns_id, "TodoHelpBorder", 24, 0, -1)
         
         -- Highlight command keys
-        for i = 3, 12 do
-          api.nvim_buf_add_highlight(state.buffer, ns_id, "TodoHelpKey", i, 2, 5)
+        for i = 3, 20 do
+          if i ~= 10 and i ~= 11 and i ~= 12 and i ~= 14 and i ~= 15 and i ~= 16 and i ~= 17 and i ~= 18 then
+            api.nvim_buf_add_highlight(state.buffer, ns_id, "TodoHelpKey", i, 2, 5)
+          end
         end
-        for i = 14, 17 do
+        for i = 22, 23 do
           api.nvim_buf_add_highlight(state.buffer, ns_id, "TodoHelpKey", i, 2, 12)
         end
       end
