@@ -63,11 +63,15 @@ end
 
 -- Refresh the todo list
 function M.refresh()
-  local todos = storage.get_todos(M.state.filter)
-  M.state.todos = todos or {}
+  if not M.is_open() then
+    return
+  end
   
-  -- Apply current sort
-  render.sort_todos(M.state)
+  -- Reload todos from storage
+  M.state.todos = storage.get_all_todos()
+  
+  -- Sort todos based on current sort settings
+  --render.sort_todos(M.state) -- Removed as sorting is now in render_todos
   
   -- Render the todos
   render.render_todos(M.state)
