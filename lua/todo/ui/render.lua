@@ -3,6 +3,7 @@ local M = {}
 local api = vim.api
 local utils = require("todo.utils")
 local config = require("todo").config
+local window = require("todo.ui.window")
 
 -- Helper function to get status line text
 local function get_status_line(state, filtered_count)
@@ -292,6 +293,43 @@ function M.apply_highlighting(state)
       tag_start = line:find("#%w+", tag_end)
     end
   end
+end
+
+-- Sort todos based on current sort settings
+function M.sort_todos(state)
+  if not state.current_sort then return end
+
+  local sort_field = state.current_sort:lower()
+  local ascending = state.sort_ascending
+
+  table.sort(state.todos, function(a, b)
+    local a_val = a[sort_field]
+    local b_val = b[sort_field]
+
+    -- Handle nil values
+    if a_val == nil and b_val == nil then return false end
+    if a_val == nil then return not ascending end
+    if b_val == nil then return ascending end
+
+    -- Special handling for dates
+    if sort_field == "created_at" or sort_field == "due_date" then
+      a_val = tonumber(a_val) or 0
+      b_val = tonumber(b_val) or 0
+    end
+
+    -- Special handling for priority
+    if sort_field == "priority" then
+      local priority_order = { H = 3, M = 2, L = 1 }
+      a_val = priority_order[a_val] or 0
+      b_val = priority_order[b_val] or 0
+    end
+
+    if ascending then
+      return a_val < b_val
+    else
+      return a_val > b_val
+    end
+  end)
 end
 
 return M
