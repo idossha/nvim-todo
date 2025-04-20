@@ -143,6 +143,11 @@ end
 
 -- Set up keybindings for the window
 function M.setup_keymaps(state)
+  -- Track last key press and time for double press detection
+  local last_key = nil
+  local last_key_time = 0
+  local DOUBLE_PRESS_TIMEOUT = 500 -- milliseconds
+  
   -- Add keymaps for todo actions
   api.nvim_buf_set_keymap(state.buffer, "n", config.mappings.add, "", {
     noremap = true,
@@ -152,11 +157,32 @@ function M.setup_keymaps(state)
     end
   })
   
+  -- Handle delete with double press
   api.nvim_buf_set_keymap(state.buffer, "n", config.mappings.delete, "", {
     noremap = true,
     silent = true,
     callback = function()
-      require("todo.ui.actions").delete_todo_under_cursor()
+      local current_time = vim.loop.now()
+      if last_key == "d" and (current_time - last_key_time) < DOUBLE_PRESS_TIMEOUT then
+        -- Double press detected, delete immediately
+        require("todo.ui.actions").delete_todo_under_cursor()
+        last_key = nil
+        last_key_time = 0
+      else
+        -- First press, just record it
+        last_key = "d"
+        last_key_time = current_time
+      end
+    end
+  })
+  
+  -- Clear last key if another key is pressed
+  api.nvim_buf_set_keymap(state.buffer, "n", "<any>", "", {
+    noremap = true,
+    silent = true,
+    callback = function()
+      last_key = nil
+      last_key_time = 0
     end
   })
   
