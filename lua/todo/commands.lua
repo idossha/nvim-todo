@@ -13,7 +13,16 @@ function M.setup()
     desc = "Open the todo list window",
   })
   
-  -- Add leader keybind for stats
+  -- Add leader keybinds
+  vim.keymap.set("n", "<leader>to", function()
+    require("todo.ui").open()
+  end, { desc = "Open todo list" })
+
+  vim.keymap.set("n", "<leader>ta", function()
+    require("todo.ui").open()
+    require("todo.ui.actions").add_todo()
+  end, { desc = "Add new todo" })
+
   vim.keymap.set("n", "<leader>ts", function()
     require("todo").stats()
   end, { desc = "Show todo statistics" })
