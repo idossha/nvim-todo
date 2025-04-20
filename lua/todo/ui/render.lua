@@ -26,6 +26,32 @@ local function get_status_line(state)
   return table.concat(status, " | ")
 end
 
+-- Helper function to format timestamp
+local function format_timestamp(timestamp)
+  if not timestamp then return "" end
+  
+  -- If it's already a number, use it directly
+  if type(timestamp) == "number" then
+    return os.date("%Y-%m-%d %H:%M", timestamp)
+  end
+  
+  -- If it's a string, try to parse it
+  if type(timestamp) == "string" then
+    -- Try to convert to number
+    local num = tonumber(timestamp)
+    if num then
+      return os.date("%Y-%m-%d %H:%M", num)
+    end
+    
+    -- If it's already in date format, return it
+    if timestamp:match("^%d%d%d%d%-%d%d%-%d%d") then
+      return timestamp
+    end
+  end
+  
+  return ""
+end
+
 -- Format a todo item for display
 local function format_todo(todo)
   local status = todo.completed and "✓" or " "
@@ -39,10 +65,8 @@ local function format_todo(todo)
   -- Get creation date/time
   local created_at = ""
   if todo.created_at then
-    -- Convert string timestamp to number if needed
-    local timestamp = type(todo.created_at) == "string" and tonumber(todo.created_at) or todo.created_at
-    if timestamp then
-      local date = os.date("%Y-%m-%d %H:%M", timestamp)
+    local date = format_timestamp(todo.created_at)
+    if date ~= "" then
       created_at = "created: " .. date
     end
   end
@@ -50,10 +74,8 @@ local function format_todo(todo)
   -- Get completion date/time if completed
   local completed_at = ""
   if todo.completed and todo.completed_at then
-    -- Convert string timestamp to number if needed
-    local timestamp = type(todo.completed_at) == "string" and tonumber(todo.completed_at) or todo.completed_at
-    if timestamp then
-      local date = os.date("%Y-%m-%d %H:%M", timestamp)
+    local date = format_timestamp(todo.completed_at)
+    if date ~= "" then
       completed_at = " completed: " .. date
     end
   end
