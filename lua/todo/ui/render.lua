@@ -3,7 +3,28 @@ local M = {}
 local api = vim.api
 local utils = require("todo.utils")
 local config = require("todo").config
-local window = require("todo.ui.window")
+
+-- Helper function to get status line text
+local function get_status_line(state)
+  local status = {}
+  
+  -- Add filter status
+  if state.current_filter then
+    table.insert(status, "Filter: " .. state.current_filter)
+  end
+  
+  -- Add sort status with direction
+  if state.current_sort then
+    local sort_direction = state.sort_ascending and "↑" or "↓"
+    table.insert(status, "Sort: " .. state.current_sort .. " " .. sort_direction)
+  end
+  
+  -- Add todo count
+  local todo_count = #state.todos
+  table.insert(status, todo_count .. " todos")
+  
+  return table.concat(status, " | ")
+end
 
 -- Format a todo item for display
 local function format_todo(todo)
@@ -80,7 +101,7 @@ function M.render_todos(state)
   api.nvim_buf_set_option(state.buffer, "modifiable", true)
   
   -- Get status line
-  local status_line = window.get_status_line(state)
+  local status_line = get_status_line(state)
   
   -- Prepare lines
   local lines = { status_line, "" }
@@ -88,9 +109,9 @@ function M.render_todos(state)
   
   -- Add todos
   for i, todo in ipairs(state.todos) do
-    local line = string.format("%s %s", todo.completed and "[x]" or "[ ]", todo.title)
+    local line, id = format_todo(todo)
     table.insert(lines, line)
-    line_to_id[i + 2] = todo.id
+    line_to_id[i + 2] = id
   end
   
   -- Set lines and variables
