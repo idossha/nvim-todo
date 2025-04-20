@@ -123,7 +123,68 @@ function M.setup_keymaps(state)
     noremap = true,
     silent = true,
     callback = function()
-      require("todo.ui.actions").show_help()
+      -- Create help window
+      local width = math.floor(vim.o.columns * 0.4)
+      local height = math.floor(vim.o.lines * 0.4)
+      local row = math.floor((vim.o.lines - height) / 2)
+      local col = math.floor((vim.o.columns - width) / 2)
+      
+      local help_buf = api.nvim_create_buf(false, true)
+      local help_win = api.nvim_open_win(help_buf, true, {
+        relative = "editor",
+        width = width,
+        height = height,
+        row = row,
+        col = col,
+        style = "minimal",
+        border = "rounded",
+        title = " Todo Commands ",
+        title_pos = "center",
+      })
+      
+      -- Set up help content
+      local help_lines = {
+        "Todo Window Commands:",
+        "",
+        string.format("%-10s %s", "a", "Add new todo (opens input prompt)"),
+        string.format("%-10s %s", "d", "Delete todo under cursor"),
+        string.format("%-10s %s", "c", "Complete todo under cursor"),
+        string.format("%-10s %s", "e", "Edit todo under cursor (opens input prompt)"),
+        string.format("%-10s %s", "t", "Edit tags (opens tag selection menu)"),
+        string.format("%-10s %s", "p", "Set priority (opens priority selection: H/M/L)"),
+        string.format("%-10s %s", "D", "Set due date (opens date picker)"),
+        string.format("%-10s %s", "s", "Sort todos (opens sort menu: by date/priority/project)"),
+        string.format("%-10s %s", "f", "Filter todos (opens filter menu: by status/tags/project)"),
+        string.format("%-10s %s", "q", "Close todo window"),
+        string.format("%-10s %s", "h", "Show this help"),
+        "",
+        "Global Commands:",
+        "",
+        string.format("%-10s %s", "<leader>to", "Open todo list"),
+        string.format("%-10s %s", "<leader>ta", "Add new todo (opens input prompt)"),
+        string.format("%-10s %s", "<leader>ts", "Show todo statistics"),
+        "",
+        "Press 'q' to close this window"
+      }
+      
+      -- Add highlights
+      api.nvim_buf_set_option(help_buf, "modifiable", true)
+      api.nvim_buf_set_lines(help_buf, 0, -1, false, help_lines)
+      api.nvim_buf_set_option(help_buf, "modifiable", false)
+      
+      -- Add highlights for headers
+      local ns_id = api.nvim_create_namespace("TodoHelp")
+      api.nvim_buf_add_highlight(help_buf, ns_id, "Title", 0, 0, -1)
+      api.nvim_buf_add_highlight(help_buf, ns_id, "Title", 14, 0, -1)
+      
+      -- Add keybind to close help window
+      api.nvim_buf_set_keymap(help_buf, "n", "q", "", {
+        noremap = true,
+        silent = true,
+        callback = function()
+          api.nvim_win_close(help_win, true)
+        end,
+      })
     end,
   })
 
