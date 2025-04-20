@@ -26,6 +26,28 @@ local function get_window_title(state)
   return title
 end
 
+-- Helper function to get status line text
+local function get_status_line(state)
+  local status = {}
+  
+  -- Add filter status
+  if state.current_filter then
+    table.insert(status, "Filter: " .. state.current_filter)
+  end
+  
+  -- Add sort status with direction
+  if state.current_sort then
+    local sort_direction = state.sort_ascending and "↑" or "↓"
+    table.insert(status, "Sort: " .. state.current_sort .. " " .. sort_direction)
+  end
+  
+  -- Add todo count
+  local todo_count = #api.nvim_buf_get_lines(state.buffer, 0, -1, false)
+  table.insert(status, todo_count .. " todos")
+  
+  return table.concat(status, " | ")
+end
+
 -- Function to update window size and position
 local function update_window_size(state)
   if not state.window or not api.nvim_win_is_valid(state.window) then
@@ -37,7 +59,7 @@ local function update_window_size(state)
   
   -- Convert percentages to actual dimensions
   width = math.floor(vim.o.columns * width)
-  height = math.min(height, math.floor(vim.o.lines * 0.8))
+  height = math.floor(vim.o.lines * height)
   
   -- Ensure window doesn't cover the entire buffer
   width = math.min(width, math.floor(vim.o.columns * 0.8))
@@ -55,7 +77,7 @@ local function update_window_size(state)
     col = col,
     style = "minimal",
     border = config.ui.border,
-    title = get_window_title(state),
+    title = " todo.nvim ",
     title_pos = "center",
   })
 end
@@ -89,7 +111,7 @@ function M.create(state)
     col = col,
     style = "minimal",
     border = config.ui.border,
-    title = get_window_title(state),
+    title = " todo.nvim ",
     title_pos = "center",
   }
   

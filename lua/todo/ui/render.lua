@@ -3,6 +3,7 @@ local M = {}
 local api = vim.api
 local utils = require("todo.utils")
 local config = require("todo").config
+local window = require("todo.ui.window")
 
 -- Format a todo item for display
 local function format_todo(todo)
@@ -44,37 +45,28 @@ end
 
 -- Sort todos based on current sort settings
 function M.sort_todos(state)
+  if not state.current_sort then
+    return
+  end
+  
   table.sort(state.todos, function(a, b)
-    local field = state.sort.field
-    local asc = state.sort.ascending
+    local a_val, b_val
     
-    if field == "priority" then
-      local priority_value = {H = 1, M = 2, L = 3}
-      if asc then
-        return priority_value[a.priority] < priority_value[b.priority]
-      else
-        return priority_value[a.priority] > priority_value[b.priority]
-      end
-    elseif field == "due_date" then
-      if not a.due_date then return not asc end
-      if not b.due_date then return asc end
-      if asc then
-        return a.due_date < b.due_date
-      else
-        return a.due_date > b.due_date
-      end
-    elseif field == "created_at" then
-      if asc then
-        return a.created_at < b.created_at
-      else
-        return a.created_at > b.created_at
-      end
-    else -- Default to title
-      if asc then
-        return a.title < b.title
-      else
-        return a.title > b.title
-      end
+    if state.current_sort == "Date" then
+      a_val = a.due_date or a.created_at
+      b_val = b.due_date or b.created_at
+    elseif state.current_sort == "Priority" then
+      a_val = a.priority
+      b_val = b.priority
+    elseif state.current_sort == "Project" then
+      a_val = a.project or ""
+      b_val = b.project or ""
+    end
+    
+    if state.sort_ascending then
+      return a_val < b_val
+    else
+      return a_val > b_val
     end
   end)
 end
@@ -85,50 +77,47 @@ function M.render_todos(state)
     return
   end
   
-  -- Clear buffer
   api.nvim_buf_set_option(state.buffer, "modifiable", true)
-  api.nvim_buf_set_lines(state.buffer, 0, -1, false, {})
   
-  -- Add header
-  local filter_active = state.filter.completed ~= nil or 
-                        state.filter.priority ~= nil or 
-                        state.filter.project ~= nil or
-                        state.filter.tag ~= nil or
-                        state.filter.due_date ~= nil
+  -- Get status line
+  local status_line = window.get_status_line(state)
   
-  local header = ""
-  if filter_active then
-    header = "Filter active | "
-  end
-  
-  header = header .. string.format(
-    "Sort: %s %s | %d todos", 
-    state.sort.field, 
-    state.sort.ascending and "↑" or "↓",
-    #state.todos
-  )
-  
-  api.nvim_buf_set_lines(state.buffer, 0, 0, false, {header, ""})
-  
-  -- Format and add todos
-  local lines = {}
+  -- Prepare lines
+  local lines = { status_line, "" }
   local line_to_id = {}
   
+  -- Add todos
   for i, todo in ipairs(state.todos) do
-    local line, id = format_todo(todo)
+    local line = string.format("%s %s", todo.completed and "[x]" or "[ ]", todo.title)
     table.insert(lines, line)
-    line_to_id[i+2] = id  -- +2 for header lines
+    line_to_id[i + 2] = todo.id
   end
   
-  -- Set formatted lines
-  api.nvim_buf_set_lines(state.buffer, 2, 2, false, lines)
-  api.nvim_buf_set_option(state.buffer, "modifiable", false)
-  
-  -- Store line to ID mapping in buffer variable
+  -- Set lines and variables
+  api.nvim_buf_set_lines(state.buffer, 0, -1, false, lines)
   api.nvim_buf_set_var(state.buffer, "line_to_id", line_to_id)
   
-  -- Apply syntax highlighting
-  M.apply_highlighting(state)
+  -- Add highlights
+  local ns_id = api.nvim_create_namespace("TodoHighlights")
+  api.nvim_buf_clear_namespace(state.buffer, ns_id, 0, -1)
+  
+  -- Highlight status line
+  api.nvim_buf_add_highlight(state.buffer, ns_id, "TodoStatusLine", 0, 0, -1)
+  
+  -- Highlight todos
+  for i, todo in ipairs(state.todos) do
+    local line = i + 2
+    if todo.completed then
+      api.nvim_buf_add_highlight(state.buffer, ns_id, "TodoCompleted", line - 1, 0, -1)
+    end
+    if todo.priority == "H" then
+      api.nvim_buf_add_highlight(state.buffer, ns_id, "TodoHighPriority", line - 1, 0, -1)
+    elseif todo.priority == "L" then
+      api.nvim_buf_add_highlight(state.buffer, ns_id, "TodoLowPriority", line - 1, 0, -1)
+    end
+  end
+  
+  api.nvim_buf_set_option(state.buffer, "modifiable", false)
 end
 
 -- Apply syntax highlighting to todos
