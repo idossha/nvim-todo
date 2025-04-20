@@ -68,7 +68,7 @@ function M.refresh()
   end
   
   -- Reload todos from storage
-  M.state.todos = storage.get_all_todos()
+  M.state.todos = storage.get_todos()
   
   -- Render the todos
   render.render_todos(M.state)
