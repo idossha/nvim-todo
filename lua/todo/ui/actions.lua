@@ -94,19 +94,40 @@ function M.add_todo(opts)
 end
 
 -- Delete todo under cursor
-function M.delete_todo_under_cursor()
-  local id = get_todo_id_at_cursor()
+function M.delete_todo_under_cursor(skip_confirmation)
+  local api = vim.api
+  local state = require("todo.ui").state
+  local storage = require("todo.storage")
+  
+  if not state.buffer or not api.nvim_buf_is_valid(state.buffer) then
+    return
+  end
+  
+  local line = api.nvim_win_get_cursor(state.window)[1]
+  local line_to_id = api.nvim_buf_get_var(state.buffer, "line_to_id") or {}
+  local id = line_to_id[line]
+  
   if not id then
     return
   end
   
-  local confirm = vim.fn.input("Delete todo? (y/N): ")
-  if confirm:lower() ~= "y" then
+  -- Skip confirmation if called from double press
+  if skip_confirmation then
+    storage.delete_todo(id)
+    require("todo.ui").refresh()
     return
   end
   
-  storage.delete_todo(id)
-  require("todo.ui").refresh()
+  -- Otherwise show confirmation prompt
+  vim.ui.input({
+    prompt = "Delete this todo? (y/n): ",
+    default = "n"
+  }, function(input)
+    if input and input:lower() == "y" then
+      storage.delete_todo(id)
+      require("todo.ui").refresh()
+    end
+  end)
 end
 
 -- Complete todo under cursor

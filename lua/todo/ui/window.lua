@@ -164,8 +164,8 @@ function M.setup_keymaps(state)
     callback = function()
       local current_time = vim.loop.now()
       if last_key == "d" and (current_time - last_key_time) < DOUBLE_PRESS_TIMEOUT then
-        -- Double press detected, delete immediately
-        require("todo.ui.actions").delete_todo_under_cursor()
+        -- Double press detected, delete immediately without confirmation
+        require("todo.ui.actions").delete_todo_under_cursor(true)
         last_key = nil
         last_key_time = 0
       else
