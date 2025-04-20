@@ -33,7 +33,7 @@ local function update_window_size(state)
     col = col,
     style = "minimal",
     border = config.ui.border,
-    title = state.show_completed and " Completed Todos " or " Todo List ",
+    title = state.is_history and " Completed Tasks History " or " Todo List ",
     title_pos = "center",
   })
 end
@@ -67,7 +67,7 @@ function M.create(state)
     col = col,
     style = "minimal",
     border = config.ui.border,
-    title = state.show_completed and " Completed Todos " or " Todo List ",
+    title = state.is_history and " Completed Tasks History " or " Todo List ",
     title_pos = "center",
   }
   
@@ -98,41 +98,21 @@ end
 -- Set up keybindings for the window
 function M.setup_keymaps(state)
   local mappings = {
-    [config.mappings.add] = function()
-      if not state.show_completed then
-        actions.add_todo()
-      end
-    end,
     [config.mappings.delete] = actions.delete_todo_under_cursor,
-    [config.mappings.complete] = function()
-      if not state.show_completed then
-        actions.complete_todo_under_cursor()
-      end
-    end,
-    [config.mappings.edit] = function()
-      if not state.show_completed then
-        actions.edit_todo_under_cursor()
-      end
-    end,
-    [config.mappings.tags] = function()
-      if not state.show_completed then
-        actions.edit_tags()
-      end
-    end,
-    [config.mappings.priority] = function()
-      if not state.show_completed then
-        actions.set_priority()
-      end
-    end,
-    [config.mappings.due_date] = function()
-      if not state.show_completed then
-        actions.set_due_date()
-      end
-    end,
-    [config.mappings.sort] = actions.show_sort_menu,
-    [config.mappings.filter] = actions.show_filter_menu,
     [config.mappings.close] = function() require("todo.ui").close() end,
   }
+  
+  -- Only add these mappings for the main todo window (not history)
+  if not state.is_history then
+    mappings[config.mappings.add] = actions.add_todo
+    mappings[config.mappings.complete] = actions.complete_todo_under_cursor
+    mappings[config.mappings.edit] = actions.edit_todo_under_cursor
+    mappings[config.mappings.tags] = actions.edit_tags
+    mappings[config.mappings.priority] = actions.set_priority
+    mappings[config.mappings.due_date] = actions.set_due_date
+    mappings[config.mappings.sort] = actions.show_sort_menu
+    mappings[config.mappings.filter] = actions.show_filter_menu
+  end
   
   for key, func in pairs(mappings) do
     api.nvim_buf_set_keymap(state.buffer, "n", key, "", {

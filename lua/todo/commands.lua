@@ -15,11 +15,11 @@ function M.setup()
   
   -- Add leader keybinds
   vim.keymap.set("n", "<leader>to", function()
-    require("todo.ui").open()
+    require("todo.ui").open({ show_completed = false })
   end, { desc = "Open todo list" })
 
   vim.keymap.set("n", "<leader>ta", function()
-    require("todo.ui").open()
+    require("todo.ui").open({ show_completed = false })
     require("todo.ui.actions").add_todo()
   end, { desc = "Add new todo" })
 
@@ -28,8 +28,8 @@ function M.setup()
   end, { desc = "Show todo statistics" })
 
   vim.keymap.set("n", "<leader>th", function()
-    require("todo.ui").open({ show_completed = true })
-  end, { desc = "Show completed tasks" })
+    require("todo.ui").open({ show_completed = true, is_history = true })
+  end, { desc = "Show completed tasks history" })
   
   api.nvim_create_user_command("TodoAdd", function(opts)
     local args = opts.args
