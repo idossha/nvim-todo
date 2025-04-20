@@ -89,6 +89,8 @@ function M.create(state)
     state.buffer = api.nvim_create_buf(false, true)
     api.nvim_buf_set_option(state.buffer, "bufhidden", "wipe")
     api.nvim_buf_set_option(state.buffer, "filetype", "todo")
+    -- Initialize line_to_id variable
+    api.nvim_buf_set_var(state.buffer, "line_to_id", {})
   end
   
   -- Calculate initial window size and position
@@ -265,7 +267,7 @@ function M.setup_keymaps(state)
     buffer = state.buffer,
     callback = function()
       local line = api.nvim_win_get_cursor(state.window)[1]
-      local line_to_id = api.nvim_buf_get_var(state.buffer, "line_to_id")
+      local line_to_id = api.nvim_buf_get_var(state.buffer, "line_to_id") or {}
       local id = line_to_id[line]
       
       if id then
