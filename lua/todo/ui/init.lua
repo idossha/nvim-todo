@@ -70,8 +70,6 @@ function M.refresh()
   -- Reload todos from storage
   M.state.todos = storage.get_all_todos()
   
-  -- Sorting is now handled within render_todos
-  
   -- Render the todos
   render.render_todos(M.state)
 end
