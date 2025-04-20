@@ -264,10 +264,13 @@ function M.setup_keymaps(state)
           api.nvim_buf_set_lines(state.buffer, 0, -1, false, lines)
           api.nvim_buf_set_option(state.buffer, "modifiable", false)
           
-          -- Add highlight for description
+          -- Add highlight for description without affecting other highlights
           local ns_id = api.nvim_create_namespace("TodoDescription")
           api.nvim_buf_clear_namespace(state.buffer, ns_id, 0, -1)
           api.nvim_buf_add_highlight(state.buffer, ns_id, "Comment", state.description_line - 1, 0, -1)
+          
+          -- Re-apply all other highlights
+          require("todo.ui.render").apply_highlighting(state)
         elseif state.showing_description then
           -- Remove description if no longer needed
           local lines = api.nvim_buf_get_lines(state.buffer, 0, -1, false)
@@ -279,6 +282,9 @@ function M.setup_keymaps(state)
           api.nvim_buf_set_option(state.buffer, "modifiable", true)
           api.nvim_buf_set_lines(state.buffer, 0, -1, false, lines)
           api.nvim_buf_set_option(state.buffer, "modifiable", false)
+          
+          -- Re-apply all highlights
+          require("todo.ui.render").apply_highlighting(state)
         end
       elseif state.showing_description then
         -- Remove description if cursor moved to a non-todo line
@@ -291,6 +297,9 @@ function M.setup_keymaps(state)
         api.nvim_buf_set_option(state.buffer, "modifiable", true)
         api.nvim_buf_set_lines(state.buffer, 0, -1, false, lines)
         api.nvim_buf_set_option(state.buffer, "modifiable", false)
+        
+        -- Re-apply all highlights
+        require("todo.ui.render").apply_highlighting(state)
       end
     end
   })
