@@ -180,7 +180,9 @@ function M.render_todos(state)
     local include = true
     
     if state.current_filter then
-      if state.current_filter == "completed" then
+      if state.current_filter == "all" then
+        include = true  -- Show all tasks
+      elseif state.current_filter == "completed" then
         include = todo.completed
       elseif state.current_filter == "open" then
         include = not todo.completed

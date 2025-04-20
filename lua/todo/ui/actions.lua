@@ -311,7 +311,7 @@ function M.show_filter_menu()
     end
   else
     local filter_options = {
-      ["a"] = nil,  -- Show all
+      ["a"] = "all",  -- Show all tasks
       ["c"] = "completed",
       ["o"] = "open",
       ["t"] = "tags",
