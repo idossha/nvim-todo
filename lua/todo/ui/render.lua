@@ -250,50 +250,49 @@ end
 
 -- Apply syntax highlighting to todos
 function M.apply_highlighting(state)
-  local ns_id = api.nvim_create_namespace("TodoHighlight")
+  local api = vim.api
+  local ns_id = api.nvim_create_namespace("TodoHighlights")
+  
+  -- Clear existing highlights
   api.nvim_buf_clear_namespace(state.buffer, ns_id, 0, -1)
   
-  for i, todo in ipairs(state.todos) do
-    local line_num = i + 2  -- +2 for header lines
-    local line = api.nvim_buf_get_lines(state.buffer, line_num-1, line_num, false)[1]
-    
-    -- Priority highlighting
-    if todo.priority == "H" then
-      api.nvim_buf_add_highlight(state.buffer, ns_id, config.ui.highlight.priority_high, line_num-1, 4, 5)
-    elseif todo.priority == "M" then
-      api.nvim_buf_add_highlight(state.buffer, ns_id, config.ui.highlight.priority_medium, line_num-1, 4, 5)
-    elseif todo.priority == "L" then
-      api.nvim_buf_add_highlight(state.buffer, ns_id, config.ui.highlight.priority_low, line_num-1, 4, 5)
+  -- Get all lines in the buffer
+  local lines = api.nvim_buf_get_lines(state.buffer, 0, -1, false)
+  
+  -- Apply highlights to each line
+  for i, line in ipairs(lines) do
+    -- Skip if line is nil or empty
+    if not line or line == "" then
+      goto continue
     end
     
-    -- Completed task
+    -- Get todo ID for this line
+    local line_to_id = api.nvim_buf_get_var(state.buffer, "line_to_id") or {}
+    local id = line_to_id[i]
+    
+    -- Skip if no todo ID found
+    if not id then
+      goto continue
+    end
+    
+    -- Get todo data
+    local todo = require("todo.storage").get_todo(id)
+    if not todo then
+      goto continue
+    end
+    
+    -- Apply completion highlight
     if todo.completed then
-      api.nvim_buf_add_highlight(state.buffer, ns_id, config.ui.highlight.completed, line_num-1, 0, -1)
+      api.nvim_buf_add_highlight(state.buffer, ns_id, "TodoCompleted", i - 1, 0, -1)
     end
     
-    -- Due date
-    if todo.due_date and todo.due_date ~= "" then
-      local due_start = line:find("%[%d%d%d%d%-%d%d%-%d%d%]")
-      if due_start then
-        local due_end = due_start + 11  -- [YYYY-MM-DD] is 12 chars
-        local highlight = config.ui.highlight.due_date
-        
-        -- Check if overdue
-        if not todo.completed and utils.is_overdue(todo.due_date) then
-          highlight = config.ui.highlight.overdue
-        end
-        
-        api.nvim_buf_add_highlight(state.buffer, ns_id, highlight, line_num-1, due_start-1, due_end)
-      end
+    -- Apply priority highlight
+    if todo.priority then
+      local hl_group = "TodoPriority" .. todo.priority
+      api.nvim_buf_add_highlight(state.buffer, ns_id, hl_group, i - 1, 0, -1)
     end
     
-    -- Tags
-    local tag_start = line:find("#%w+")
-    while tag_start do
-      local tag_end = line:find("%s", tag_start) or #line + 1
-      api.nvim_buf_add_highlight(state.buffer, ns_id, config.ui.highlight.tags, line_num-1, tag_start-1, tag_end-1)
-      tag_start = line:find("#%w+", tag_end)
-    end
+    ::continue::
   end
 end
 
