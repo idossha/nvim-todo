@@ -274,8 +274,7 @@ function M.show_sort_menu()
     end
     state.last_sort = sort_options[key]
     
-    -- Sort and refresh
-    require("todo.ui.render").sort_todos(state)
+    -- Refresh the UI (sorting happens in render)
     require("todo.ui").refresh()
   end
 end

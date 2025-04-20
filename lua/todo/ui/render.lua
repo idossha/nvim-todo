@@ -5,23 +5,26 @@ local utils = require("todo.utils")
 local config = require("todo").config
 
 -- Helper function to get status line text
-local function get_status_line(state)
+local function get_status_line(state, filtered_count)
   local status = {}
   
   -- Add filter status
   if state.current_filter then
     table.insert(status, "Filter: " .. state.current_filter)
+  else
+    table.insert(status, "Filter: none")
   end
   
   -- Add sort status with direction
   if state.current_sort then
     local sort_direction = state.sort_ascending and "↑" or "↓"
     table.insert(status, "Sort: " .. state.current_sort .. " " .. sort_direction)
+  else
+    table.insert(status, "Sort: none")
   end
   
-  -- Add todo count
-  local todo_count = #state.todos
-  table.insert(status, todo_count .. " todos")
+  -- Add todo count (filtered)
+  table.insert(status, filtered_count .. " todos")
   
   return table.concat(status, " | ")
 end
@@ -117,24 +120,36 @@ local function format_todo(todo)
 end
 
 -- Sort todos based on current sort settings
-function M.sort_todos(state)
+-- Now sorts the provided list in place
+local function sort_todos(todos_list, state)
   if not state.current_sort then
     return
   end
   
-  table.sort(state.todos, function(a, b)
+  table.sort(todos_list, function(a, b)
     local a_val, b_val
     
     if state.current_sort == "Date" then
-      a_val = a.due_date or a.created_at
-      b_val = b.due_date or b.created_at
+      a_val = a.due_date or a.created_at or 0 -- Handle nil dates for sorting
+      b_val = b.due_date or b.created_at or 0
+      -- Convert timestamps to numbers if they are strings
+      a_val = type(a_val) == "string" and tonumber(a_val) or a_val
+      b_val = type(b_val) == "string" and tonumber(b_val) or b_val
     elseif state.current_sort == "Priority" then
-      a_val = a.priority
-      b_val = b.priority
+      -- Define priority order
+      local priority_order = { H = 1, M = 2, L = 3 }
+      a_val = priority_order[a.priority] or 2
+      b_val = priority_order[b.priority] or 2
     elseif state.current_sort == "Project" then
-      a_val = a.project or ""
-      b_val = b.project or ""
+      a_val = a.project or "zzzz"
+      b_val = b.project or "zzzz"
+    else
+      return false -- Should not happen
     end
+    
+    -- Handle potential nil values after conversion/lookup
+    a_val = a_val or (state.sort_ascending and math.huge or -math.huge)
+    b_val = b_val or (state.sort_ascending and math.huge or -math.huge)
     
     if state.sort_ascending then
       return a_val < b_val
@@ -152,16 +167,15 @@ function M.render_todos(state)
   
   api.nvim_buf_set_option(state.buffer, "modifiable", true)
   
-  -- Get status line
-  local status_line = get_status_line(state)
+  -- Start with all todos from the current state
+  local current_todos = state.todos
   
-  -- Prepare lines
-  local lines = { status_line, "" }
-  local line_to_id = {}
+  -- Sort the current list if needed
+  sort_todos(current_todos, state)
   
   -- Filter todos based on current filter
   local filtered_todos = {}
-  for _, todo in ipairs(state.todos) do
+  for _, todo in ipairs(current_todos) do
     local include = true
     
     if state.current_filter then
@@ -170,12 +184,23 @@ function M.render_todos(state)
       elseif state.current_filter == "open" then
         include = not todo.completed
       elseif state.current_filter:match("^priority:") then
-        local priority = state.current_filter:match("^priority:(.+)$")
-        include = todo.priority == priority
+        local priority_filter = state.current_filter:match("^priority:(.+)$")
+        -- Compare with actual priority value (H, M, L)
+        if priority_filter == "High" then
+            include = todo.priority == "H"
+        elseif priority_filter == "Medium" then
+            include = todo.priority == "M"
+        elseif priority_filter == "Low" then
+            include = todo.priority == "L"
+        else
+            include = false -- Invalid priority filter
+        end
       elseif state.current_filter == "tags" then
-        include = todo.tags and #todo.tags > 0
+        -- TODO: Implement actual tag filtering based on user input
+        include = todo.tags and #todo.tags > 0 -- Placeholder: checks if tags exist
       elseif state.current_filter == "project" then
-        include = todo.project and todo.project ~= ""
+        -- TODO: Implement actual project filtering based on user input
+        include = todo.project and todo.project ~= "" -- Placeholder: checks if project exists
       end
     end
     
@@ -184,7 +209,14 @@ function M.render_todos(state)
     end
   end
   
-  -- Add todos
+  -- Get status line based on filtered count
+  local status_line = get_status_line(state, #filtered_todos)
+  
+  -- Prepare lines
+  local lines = { status_line, "" }
+  local line_to_id = {}
+  
+  -- Add filtered todos
   for i, todo in ipairs(filtered_todos) do
     local line, id = format_todo(todo)
     table.insert(lines, line)
@@ -202,7 +234,7 @@ function M.render_todos(state)
   -- Highlight status line
   api.nvim_buf_add_highlight(state.buffer, ns_id, "TodoStatusLine", 0, 0, -1)
   
-  -- Highlight completed todos
+  -- Highlight completed todos in the filtered list
   for i, todo in ipairs(filtered_todos) do
     local line = i + 2
     if todo.completed then
