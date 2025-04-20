@@ -54,6 +54,11 @@ function M.save()
   end
 end
 
+-- Get all todos
+function M.get_all_todos()
+  return M.todos
+end
+
 -- Create a new todo
 function M.create_todo(todo)
   -- Assign an ID
@@ -71,7 +76,7 @@ function M.create_todo(todo)
     project = todo.project or "",
     completed = false,
     completed_at = nil,
-    created_at = os.date("%Y-%m-%d %H:%M:%S")
+    created_at = os.time()
   }
   
   -- Add to storage
@@ -81,51 +86,6 @@ function M.create_todo(todo)
   M.save()
   
   return id
-end
-
--- Get all todos
-function M.get_todos(filter)
-  if not filter then
-    return M.todos
-  end
-  
-  -- Filter todos based on criteria
-  local filtered = {}
-  
-  for _, todo in ipairs(M.todos) do
-    local include = true
-    
-    if filter.completed ~= nil and todo.completed ~= filter.completed then
-      include = false
-    end
-    
-    if filter.priority and todo.priority ~= filter.priority then
-      include = false
-    end
-    
-    if filter.project and todo.project ~= filter.project then
-      include = false
-    end
-    
-    if filter.tag and not utils.has_tag(todo.tags, filter.tag) then
-      include = false
-    end
-    
-    if filter.due_date and todo.due_date then
-      local due_timestamp = utils.parse_date(todo.due_date)
-      local filter_timestamp = utils.parse_date(filter.due_date)
-      
-      if not due_timestamp or not filter_timestamp or due_timestamp > filter_timestamp then
-        include = false
-      end
-    end
-    
-    if include then
-      table.insert(filtered, todo)
-    end
-  end
-  
-  return filtered
 end
 
 -- Get a single todo by ID
@@ -169,7 +129,7 @@ function M.complete_todo(id)
   end
   
   todo.completed = true
-  todo.completed_at = os.date("%Y-%m-%d %H:%M:%S")
+  todo.completed_at = os.time()
   
   -- Save changes
   M.save()
