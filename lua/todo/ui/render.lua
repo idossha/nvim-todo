@@ -39,15 +39,23 @@ local function format_todo(todo)
   -- Get creation date/time
   local created_at = ""
   if todo.created_at then
-    local date = os.date("%Y-%m-%d %H:%M", todo.created_at)
-    created_at = "created: " .. date
+    -- Convert string timestamp to number if needed
+    local timestamp = type(todo.created_at) == "string" and tonumber(todo.created_at) or todo.created_at
+    if timestamp then
+      local date = os.date("%Y-%m-%d %H:%M", timestamp)
+      created_at = "created: " .. date
+    end
   end
   
   -- Get completion date/time if completed
   local completed_at = ""
   if todo.completed and todo.completed_at then
-    local date = os.date("%Y-%m-%d %H:%M", todo.completed_at)
-    completed_at = " completed: " .. date
+    -- Convert string timestamp to number if needed
+    local timestamp = type(todo.completed_at) == "string" and tonumber(todo.completed_at) or todo.completed_at
+    if timestamp then
+      local date = os.date("%Y-%m-%d %H:%M", timestamp)
+      completed_at = " completed: " .. date
+    end
   end
   
   -- Priority letter
