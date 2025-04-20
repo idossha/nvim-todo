@@ -33,7 +33,7 @@ local function update_window_size(state)
     col = col,
     style = "minimal",
     border = config.ui.border,
-    title = " Todo List ",
+    title = state.show_completed and " Completed Todos " or " Todo List ",
     title_pos = "center",
   })
 end
@@ -67,7 +67,7 @@ function M.create(state)
     col = col,
     style = "minimal",
     border = config.ui.border,
-    title = " Todo List ",
+    title = state.show_completed and " Completed Todos " or " Todo List ",
     title_pos = "center",
   }
   
@@ -98,13 +98,37 @@ end
 -- Set up keybindings for the window
 function M.setup_keymaps(state)
   local mappings = {
-    [config.mappings.add] = actions.add_todo,
+    [config.mappings.add] = function()
+      if not state.show_completed then
+        actions.add_todo()
+      end
+    end,
     [config.mappings.delete] = actions.delete_todo_under_cursor,
-    [config.mappings.complete] = actions.complete_todo_under_cursor,
-    [config.mappings.edit] = actions.edit_todo_under_cursor,
-    [config.mappings.tags] = actions.edit_tags,
-    [config.mappings.priority] = actions.set_priority,
-    [config.mappings.due_date] = actions.set_due_date,
+    [config.mappings.complete] = function()
+      if not state.show_completed then
+        actions.complete_todo_under_cursor()
+      end
+    end,
+    [config.mappings.edit] = function()
+      if not state.show_completed then
+        actions.edit_todo_under_cursor()
+      end
+    end,
+    [config.mappings.tags] = function()
+      if not state.show_completed then
+        actions.edit_tags()
+      end
+    end,
+    [config.mappings.priority] = function()
+      if not state.show_completed then
+        actions.set_priority()
+      end
+    end,
+    [config.mappings.due_date] = function()
+      if not state.show_completed then
+        actions.set_due_date()
+      end
+    end,
     [config.mappings.sort] = actions.show_sort_menu,
     [config.mappings.filter] = actions.show_filter_menu,
     [config.mappings.close] = function() require("todo.ui").close() end,
@@ -157,6 +181,7 @@ function M.setup_keymaps(state)
           "│ <leader>to │ Open todo list   │",
           "│ <leader>ta │ Add new todo     │",
           "│ <leader>ts │ Show statistics  │",
+          "│ <leader>th │ Show completed   │",
           "╰───────────────────────────────╯"
         }
         
@@ -184,13 +209,13 @@ function M.setup_keymaps(state)
         api.nvim_buf_add_highlight(state.buffer, ns_id, "TodoHelpBorder", 0, 0, -1)
         api.nvim_buf_add_highlight(state.buffer, ns_id, "TodoHelpBorder", 2, 0, -1)
         api.nvim_buf_add_highlight(state.buffer, ns_id, "TodoHelpBorder", 13, 0, -1)
-        api.nvim_buf_add_highlight(state.buffer, ns_id, "TodoHelpBorder", 17, 0, -1)
+        api.nvim_buf_add_highlight(state.buffer, ns_id, "TodoHelpBorder", 18, 0, -1)
         
         -- Highlight command keys
         for i = 3, 12 do
           api.nvim_buf_add_highlight(state.buffer, ns_id, "TodoHelpKey", i, 2, 5)
         end
-        for i = 14, 16 do
+        for i = 14, 17 do
           api.nvim_buf_add_highlight(state.buffer, ns_id, "TodoHelpKey", i, 2, 12)
         end
       end
