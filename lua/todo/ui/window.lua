@@ -250,7 +250,8 @@ function M.setup_keymaps(state)
     end
   })
   
-  api.nvim_buf_set_keymap(state.buffer, "n", config.mappings.help, "", {
+  -- Add help keybinding
+  api.nvim_buf_set_keymap(state.buffer, "n", "h", "", {
     noremap = true,
     silent = true,
     callback = function()
