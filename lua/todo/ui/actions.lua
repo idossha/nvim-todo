@@ -351,9 +351,6 @@ function M.show_help()
   local ui = require("todo.ui")
   local mappings = config.mappings
   
-  -- Store current todos
-  local current_todos = ui.state.todos
-  
   -- Display help table
   api.nvim_buf_set_option(ui.state.buffer, "modifiable", true)
   
@@ -400,10 +397,6 @@ function M.show_help()
   
   -- Wait for keypress
   vim.fn.getchar()
-  
-  -- Restore todos
-  ui.state.todos = current_todos
-  require("todo.ui").refresh()
 end
 
 return M

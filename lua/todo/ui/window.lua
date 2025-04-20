@@ -255,7 +255,25 @@ function M.setup_keymaps(state)
     noremap = true,
     silent = true,
     callback = function()
+      -- Store current state
+      local current_state = {
+        todos = state.todos,
+        current_filter = state.current_filter,
+        current_sort = state.current_sort,
+        sort_ascending = state.sort_ascending
+      }
+      
+      -- Show help
       require("todo.ui.actions").show_help()
+      
+      -- Restore state after help is closed
+      state.todos = current_state.todos
+      state.current_filter = current_state.current_filter
+      state.current_sort = current_state.current_sort
+      state.sort_ascending = current_state.sort_ascending
+      
+      -- Refresh the view
+      require("todo.ui").refresh()
     end
   })
   
