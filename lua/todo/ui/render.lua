@@ -159,8 +159,33 @@ function M.render_todos(state)
   local lines = { status_line, "" }
   local line_to_id = {}
   
+  -- Filter todos based on current filter
+  local filtered_todos = {}
+  for _, todo in ipairs(state.todos) do
+    local include = true
+    
+    if state.current_filter then
+      if state.current_filter == "completed" then
+        include = todo.completed
+      elseif state.current_filter == "open" then
+        include = not todo.completed
+      elseif state.current_filter:match("^priority:") then
+        local priority = state.current_filter:match("^priority:(.+)$")
+        include = todo.priority == priority
+      elseif state.current_filter == "tags" then
+        include = todo.tags and #todo.tags > 0
+      elseif state.current_filter == "project" then
+        include = todo.project and todo.project ~= ""
+      end
+    end
+    
+    if include then
+      table.insert(filtered_todos, todo)
+    end
+  end
+  
   -- Add todos
-  for i, todo in ipairs(state.todos) do
+  for i, todo in ipairs(filtered_todos) do
     local line, id = format_todo(todo)
     table.insert(lines, line)
     line_to_id[i + 2] = id
@@ -178,7 +203,7 @@ function M.render_todos(state)
   api.nvim_buf_add_highlight(state.buffer, ns_id, "TodoStatusLine", 0, 0, -1)
   
   -- Highlight completed todos
-  for i, todo in ipairs(state.todos) do
+  for i, todo in ipairs(filtered_todos) do
     local line = i + 2
     if todo.completed then
       api.nvim_buf_add_highlight(state.buffer, ns_id, "TodoCompleted", line - 1, 0, -1)

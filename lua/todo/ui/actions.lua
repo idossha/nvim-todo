@@ -273,6 +273,9 @@ function M.show_sort_menu()
       state.sort_ascending = true
     end
     state.last_sort = sort_options[key]
+    
+    -- Sort and refresh
+    require("todo.ui.render").sort_todos(state)
     require("todo.ui").refresh()
   end
 end
