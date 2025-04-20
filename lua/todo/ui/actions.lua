@@ -351,6 +351,17 @@ function M.show_help()
   local ui = require("todo.ui")
   local mappings = config.mappings
   
+  -- Check if help is already shown
+  if ui.state.showing_help then
+    -- Help is shown, close it
+    ui.state.showing_help = false
+    require("todo.ui").refresh()
+    return
+  end
+  
+  -- Help is not shown, display it
+  ui.state.showing_help = true
+  
   -- Display help table
   api.nvim_buf_set_option(ui.state.buffer, "modifiable", true)
   
@@ -371,7 +382,7 @@ function M.show_help()
     string.format("│ %s: Close window           │", mappings.close),
     "╰───────────────────────────────╯",
     "",
-    "Press any key to continue"
+    "Press 'h' to close"
   }
   
   -- Set help lines
@@ -394,9 +405,6 @@ function M.show_help()
   for i = 4, #help_lines - 2 do
     api.nvim_buf_add_highlight(ui.state.buffer, ns_id, "TodoHelpCommand", i - 1, 0, -1)
   end
-  
-  -- Wait for keypress
-  vim.fn.getchar()
 end
 
 return M
