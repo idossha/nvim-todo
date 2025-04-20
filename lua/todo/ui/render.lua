@@ -36,12 +36,22 @@ local function format_todo(todo)
     due = " [" .. todo.due_date .. "]"
   end
   
-  local priority_marker = ""
-  if todo.priority == "H" then
-    priority_marker = "!"
-  elseif todo.priority == "M" then
-    priority_marker = "·"
+  -- Get creation date/time
+  local created_at = ""
+  if todo.created_at then
+    local date = os.date("%Y-%m-%d %H:%M", todo.created_at)
+    created_at = "created: " .. date
   end
+  
+  -- Get completion date/time if completed
+  local completed_at = ""
+  if todo.completed and todo.completed_at then
+    local date = os.date("%Y-%m-%d %H:%M", todo.completed_at)
+    completed_at = " completed: " .. date
+  end
+  
+  -- Priority letter
+  local priority = todo.priority or "M"
   
   local tags = ""
   if todo.tags and #todo.tags > 0 then
@@ -53,14 +63,26 @@ local function format_todo(todo)
     project = " @" .. todo.project
   end
   
-  return string.format(
-    "[%s] %s %s%s%s%s", 
-    status, 
-    priority_marker, 
+  -- Calculate the main content length
+  local main_content = string.format(
+    "[%s] [%s]  %s%s%s%s",
+    status,
+    priority,
     todo.title,
     due,
     project,
     tags
+  )
+  
+  -- Calculate padding to align dates to the right
+  local padding = string.rep(" ", math.max(0, 80 - #main_content - #created_at - #completed_at))
+  
+  return string.format(
+    "%s%s%s%s",
+    main_content,
+    padding,
+    created_at,
+    completed_at
   ), todo.id
 end
 
@@ -125,16 +147,11 @@ function M.render_todos(state)
   -- Highlight status line
   api.nvim_buf_add_highlight(state.buffer, ns_id, "TodoStatusLine", 0, 0, -1)
   
-  -- Highlight todos
+  -- Highlight completed todos
   for i, todo in ipairs(state.todos) do
     local line = i + 2
     if todo.completed then
       api.nvim_buf_add_highlight(state.buffer, ns_id, "TodoCompleted", line - 1, 0, -1)
-    end
-    if todo.priority == "H" then
-      api.nvim_buf_add_highlight(state.buffer, ns_id, "TodoHighPriority", line - 1, 0, -1)
-    elseif todo.priority == "L" then
-      api.nvim_buf_add_highlight(state.buffer, ns_id, "TodoLowPriority", line - 1, 0, -1)
     end
   end
   
