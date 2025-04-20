@@ -98,16 +98,16 @@ end
 -- Set up keybindings for the window
 function M.setup_keymaps(state)
   local mappings = {
-    [config.mappings.add] = actions.add_todo,
-    [config.mappings.delete] = actions.delete_todo_under_cursor,
-    [config.mappings.complete] = actions.complete_todo_under_cursor,
-    [config.mappings.edit] = actions.edit_todo_under_cursor,
-    [config.mappings.tags] = actions.edit_tags,
-    [config.mappings.priority] = actions.set_priority,
-    [config.mappings.due_date] = actions.set_due_date,
-    [config.mappings.sort] = actions.show_sort_menu,
-    [config.mappings.filter] = actions.show_filter_menu,
-    [config.mappings.close] = function() require("todo.ui").close() end,
+    [config.default_config.mappings.add] = actions.add_todo,
+    [config.default_config.mappings.delete] = actions.delete_todo_under_cursor,
+    [config.default_config.mappings.complete] = actions.complete_todo_under_cursor,
+    [config.default_config.mappings.edit] = actions.edit_todo_under_cursor,
+    [config.default_config.mappings.tags] = actions.edit_tags,
+    [config.default_config.mappings.priority] = actions.set_priority,
+    [config.default_config.mappings.due_date] = actions.set_due_date,
+    [config.default_config.mappings.sort] = actions.show_sort_menu,
+    [config.default_config.mappings.filter] = actions.show_filter_menu,
+    [config.default_config.mappings.close] = function() require("todo.ui").close() end,
   }
   
   for key, func in pairs(mappings) do
