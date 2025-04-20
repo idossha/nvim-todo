@@ -248,152 +248,51 @@ end
 
 -- Show sort menu
 function M.show_sort_menu()
-  local ui = require("todo.ui")
-  
-  local sort_options = {
-    { key = "p", name = "Priority", field = "priority" },
-    { key = "d", name = "Due Date", field = "due_date" },
-    { key = "c", name = "Creation Date", field = "created_at" },
-    { key = "t", name = "Title", field = "title" },
-  }
-  
-  -- Display options
-  api.nvim_buf_set_option(ui.state.buffer, "modifiable", true)
-  api.nvim_buf_set_lines(ui.state.buffer, 0, -1, false, {
-    "--- Sort by ---",
-    "",
-  })
-  
-  local lines = {}
-  for _, option in ipairs(sort_options) do
-    local selected = ui.state.sort.field == option.field
-    local direction = ui.state.sort.ascending and "↑" or "↓"
-    local line = string.format("%s: %s %s", option.key, option.name, selected and direction or "")
-    table.insert(lines, line)
-  end
-  
-  table.insert(lines, "")
-  table.insert(lines, "r: Reverse order")
-  table.insert(lines, "")
-  table.insert(lines, "Press any key to sort, Esc to cancel")
-  
-  api.nvim_buf_set_lines(ui.state.buffer, 2, 2, false, lines)
-  api.nvim_buf_set_option(ui.state.buffer, "modifiable", false)
-  
-  -- Wait for keypress
-  local key = vim.fn.getchar()
-  
-  -- Convert to string
-  if type(key) == "number" then
-    key = vim.fn.nr2char(key)
-  end
-  
-  -- Handle key
-  if key == "\27" then -- Escape
-    -- Cancel, just refresh
-    ui.refresh()
-    return
-  elseif key == "r" then
-    -- Reverse current sort
-    ui.state.sort.ascending = not ui.state.sort.ascending
-  else
-    -- Look for sort option
-    for _, option in ipairs(sort_options) do
-      if key == option.key then
-        if ui.state.sort.field == option.field then
-          -- Toggle direction if same field
-          ui.state.sort.ascending = not ui.state.sort.ascending
+  local state = require("todo.ui").get_state()
+  vim.ui.select(
+    { "Date", "Priority", "Project" },
+    {
+      prompt = "Sort by:",
+      format_item = function(item)
+        local direction = state.sort_ascending and "↑" or "↓"
+        return item .. " " .. direction
+      end,
+    },
+    function(choice)
+      if choice then
+        state.current_sort = choice
+        -- Toggle sort direction if same sort is selected
+        if state.last_sort == choice then
+          state.sort_ascending = not state.sort_ascending
         else
-          -- Set new field with default direction
-          ui.state.sort.field = option.field
-          ui.state.sort.ascending = true
+          state.sort_ascending = true
         end
-        break
+        state.last_sort = choice
+        require("todo.ui").refresh()
       end
     end
-  end
-  
-  -- Refresh with new sort
-  ui.refresh()
+  )
 end
 
 -- Show filter menu
 function M.show_filter_menu()
-  local ui = require("todo.ui")
-  
-  local filter_options = {
-    { key = "a", name = "All", filter = { completed = nil } },
-    { key = "p", name = "Pending", filter = { completed = false } },
-    { key = "c", name = "Completed", filter = { completed = true } },
-    { key = "h", name = "High Priority", filter = { priority = "H", completed = false } },
-    { key = "m", name = "Medium Priority", filter = { priority = "M", completed = false } },
-    { key = "l", name = "Low Priority", filter = { priority = "L", completed = false } },
-    { key = "d", name = "Due Today", filter = { due_date = os.date("%Y-%m-%d"), completed = false } },
-    { key = "o", name = "Overdue", filter = { due_date = "<" .. os.date("%Y-%m-%d"), completed = false } },
-    { key = "t", name = "By Tag", filter = "tag_prompt" },
-    { key = "r", name = "By Project", filter = "project_prompt" },
-    { key = "z", name = "Clear Filters", filter = {} },
-  }
-  
-  -- Display options
-  api.nvim_buf_set_option(ui.state.buffer, "modifiable", true)
-  api.nvim_buf_set_lines(ui.state.buffer, 0, -1, false, {
-    "--- Filter ---",
-    ""
-  })
-  
-  local lines = {}
-  for _, option in ipairs(filter_options) do
-    local line = string.format("%s: %s", option.key, option.name)
-    table.insert(lines, line)
-  end
-  
-  table.insert(lines, "")
-  table.insert(lines, "Press a key to select filter, Esc to cancel")
-  
-  api.nvim_buf_set_lines(ui.state.buffer, 2, 2, false, lines)
-  api.nvim_buf_set_option(ui.state.buffer, "modifiable", false)
-  
-  -- Wait for keypress
-  local key = vim.fn.getchar()
-  
-  -- Convert to string
-  if type(key) == "number" then
-    key = vim.fn.nr2char(key)
-  end
-  
-  -- Handle key
-  if key == "\27" then -- Escape
-    -- Cancel, just refresh
-    ui.refresh()
-    return
-  end
-  
-  -- Look for filter option
-  for _, option in ipairs(filter_options) do
-    if key == option.key then
-      if option.filter == "tag_prompt" then
-        -- Prompt for tag
-        local tag = vim.fn.input("Filter by tag: ")
-        if tag ~= "" then
-          ui.state.filter = { tag = tag, completed = false }
+  local state = require("todo.ui").get_state()
+  vim.ui.select(
+    { "Status", "Tags", "Project", "Priority", "Clear filters" },
+    {
+      prompt = "Filter by:",
+    },
+    function(choice)
+      if choice then
+        if choice == "Clear filters" then
+          state.current_filter = nil
+        else
+          state.current_filter = choice
         end
-      elseif option.filter == "project_prompt" then
-        -- Prompt for project
-        local project = vim.fn.input("Filter by project: ")
-        if project ~= "" then
-          ui.state.filter = { project = project, completed = false }
-        end
-      else
-        -- Apply filter
-        ui.state.filter = option.filter
+        require("todo.ui").refresh()
       end
-      break
     end
-  end
-  
-  -- Refresh with new filter
-  ui.refresh()
+  )
 end
 
 -- Show help

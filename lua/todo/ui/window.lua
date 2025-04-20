@@ -7,12 +7,22 @@ local actions = require("todo.ui.actions")
 -- Helper function to get window title based on current state
 local function get_window_title(state)
   local title = " Todo List "
+  
+  -- Add filter status
   if state.current_filter then
-    title = title .. "| Filtered: " .. state.current_filter
+    title = title .. "| Filter: " .. state.current_filter
   end
+  
+  -- Add sort status with direction
   if state.current_sort then
-    title = title .. " | Sorted: " .. state.current_sort
+    local sort_direction = state.sort_ascending and "↑" or "↓"
+    title = title .. " | Sort: " .. state.current_sort .. " " .. sort_direction
   end
+  
+  -- Add todo count
+  local todo_count = #api.nvim_buf_get_lines(state.buffer, 0, -1, false)
+  title = title .. " | " .. todo_count .. " todos"
+  
   return title
 end
 
@@ -27,7 +37,7 @@ local function update_window_size(state)
   
   -- Convert percentages to actual dimensions
   width = math.floor(vim.o.columns * width)
-  height = math.floor(vim.o.lines * height)
+  height = math.min(height, math.floor(vim.o.lines * 0.8))
   
   -- Ensure window doesn't cover the entire buffer
   width = math.min(width, math.floor(vim.o.columns * 0.8))

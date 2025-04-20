@@ -13,6 +13,15 @@ local render = require("todo.ui.render")
 M.state = {
   buffer = nil,
   window = nil,
+  showing_help = false,
+  help_start_line = nil,
+  help_end_line = nil,
+  showing_description = false,
+  description_line = nil,
+  current_filter = nil,
+  current_sort = nil,
+  sort_ascending = true,
+  last_sort = nil,
   todos = {},
   filter = {
     completed = false,
@@ -26,6 +35,10 @@ M.state = {
     ascending = true,
   },
 }
+
+function M.get_state()
+  return M.state
+end
 
 -- Check if the UI is open
 function M.is_open()
