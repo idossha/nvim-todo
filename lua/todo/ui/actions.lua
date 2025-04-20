@@ -351,32 +351,59 @@ function M.show_help()
   local ui = require("todo.ui")
   local mappings = config.mappings
   
-  -- Display help
+  -- Store current todos
+  local current_todos = ui.state.todos
+  
+  -- Display help table
   api.nvim_buf_set_option(ui.state.buffer, "modifiable", true)
-  api.nvim_buf_set_lines(ui.state.buffer, 0, -1, false, {
-    "--- Todo.nvim Help ---",
-    "",
-    string.format("%s: Add new todo", mappings.add),
-    string.format("%s: Delete todo under cursor", mappings.delete),
-    string.format("%s: Complete todo under cursor", mappings.complete),
-    string.format("%s: Edit todo under cursor", mappings.edit),
-    string.format("%s: Edit tags", mappings.tags),
-    string.format("%s: Set priority", mappings.priority),
-    string.format("%s: Set due date", mappings.due_date),
-    string.format("%s: Sort todos", mappings.sort),
-    string.format("%s: Filter todos", mappings.filter),
-    string.format("%s: Close window", mappings.close),
-    string.format("%s: Show this help", mappings.help),
+  
+  -- Create help table with box drawing characters
+  local help_lines = {
+    "╭───────────────────────────────╮",
+    "│        Todo.nvim Help         │",
+    "├───────────────────────────────┤",
+    string.format("│ %s: Add new todo           │", mappings.add),
+    string.format("│ %s: Delete todo            │", mappings.delete),
+    string.format("│ %s: Complete todo          │", mappings.complete),
+    string.format("│ %s: Edit todo              │", mappings.edit),
+    string.format("│ %s: Edit tags              │", mappings.tags),
+    string.format("│ %s: Set priority           │", mappings.priority),
+    string.format("│ %s: Set due date           │", mappings.due_date),
+    string.format("│ %s: Sort todos             │", mappings.sort),
+    string.format("│ %s: Filter todos           │", mappings.filter),
+    string.format("│ %s: Close window           │", mappings.close),
+    "╰───────────────────────────────╯",
     "",
     "Press any key to continue"
-  })
+  }
+  
+  -- Set help lines
+  api.nvim_buf_set_lines(ui.state.buffer, 0, -1, false, help_lines)
   api.nvim_buf_set_option(ui.state.buffer, "modifiable", false)
+  
+  -- Add highlights
+  local ns_id = api.nvim_create_namespace("TodoHelp")
+  api.nvim_buf_clear_namespace(ui.state.buffer, ns_id, 0, -1)
+  
+  -- Highlight the box
+  for i = 1, #help_lines do
+    api.nvim_buf_add_highlight(ui.state.buffer, ns_id, "TodoHelpBorder", i - 1, 0, -1)
+  end
+  
+  -- Highlight the title
+  api.nvim_buf_add_highlight(ui.state.buffer, ns_id, "TodoHelpTitle", 1, 0, -1)
+  
+  -- Highlight the commands
+  for i = 4, #help_lines - 2 do
+    api.nvim_buf_add_highlight(ui.state.buffer, ns_id, "TodoHelpCommand", i - 1, 0, -1)
+  end
   
   -- Wait for keypress
   vim.fn.getchar()
   
-  -- Refresh
-  ui.refresh()
+  -- Restore todos
+  ui.state.todos = current_todos
+  require("todo.ui").refresh()
 end
 
 return M
