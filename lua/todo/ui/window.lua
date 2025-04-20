@@ -4,6 +4,18 @@ local api = vim.api
 local config = require("todo").config
 local actions = require("todo.ui.actions")
 
+-- Helper function to get window title based on current state
+local function get_window_title(state)
+  local title = " Todo List "
+  if state.current_filter then
+    title = title .. "| Filtered: " .. state.current_filter
+  end
+  if state.current_sort then
+    title = title .. " | Sorted: " .. state.current_sort
+  end
+  return title
+end
+
 -- Function to update window size and position
 local function update_window_size(state)
   if not state.window or not api.nvim_win_is_valid(state.window) then
@@ -93,18 +105,6 @@ function M.create(state)
   
   -- Set up keybindings
   M.setup_keymaps(state)
-end
-
--- Helper function to get window title based on current state
-local function get_window_title(state)
-  local title = " Todo List "
-  if state.current_filter then
-    title = title .. "| Filtered: " .. state.current_filter
-  end
-  if state.current_sort then
-    title = title .. " | Sorted: " .. state.current_sort
-  end
-  return title
 end
 
 -- Set up keybindings for the window
