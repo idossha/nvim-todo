@@ -263,6 +263,11 @@ function M.setup_keymaps(state)
   api.nvim_create_autocmd("CursorMoved", {
     buffer = state.buffer,
     callback = function()
+      -- Skip if help is shown
+      if state.showing_help then
+        return
+      end
+      
       -- Get current cursor position
       local line = api.nvim_win_get_cursor(state.window)[1]
       local total_lines = api.nvim_buf_line_count(state.buffer)
