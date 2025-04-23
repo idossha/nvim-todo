@@ -263,10 +263,21 @@ function M.setup_keymaps(state)
   api.nvim_create_autocmd("CursorMoved", {
     buffer = state.buffer,
     callback = function()
+      -- Get current cursor position
       local line = api.nvim_win_get_cursor(state.window)[1]
+      local total_lines = api.nvim_buf_line_count(state.buffer)
+      
+      -- Prevent cursor from going below the last todo
+      if line > total_lines then
+        api.nvim_win_set_cursor(state.window, {total_lines, 0})
+        return
+      end
+      
+      -- Get todo ID for current line
       local line_to_id = api.nvim_buf_get_var(state.buffer, "line_to_id") or {}
       local id = line_to_id[line]
       
+      -- Handle description display
       if id then
         local todo = require("todo.storage").get_todo(id)
         if todo and todo.description and todo.description:match("%S") then
@@ -275,8 +286,10 @@ function M.setup_keymaps(state)
           
           -- Check if description is already shown
           if state.showing_description then
-            -- Remove old description
-            table.remove(lines, state.description_line)
+            -- Remove old description if it exists
+            if state.description_line and state.description_line <= #lines then
+              table.remove(lines, state.description_line)
+            end
             state.showing_description = false
             state.description_line = nil
           end
@@ -301,7 +314,9 @@ function M.setup_keymaps(state)
         elseif state.showing_description then
           -- Remove description if no longer needed
           local lines = api.nvim_buf_get_lines(state.buffer, 0, -1, false)
-          table.remove(lines, state.description_line)
+          if state.description_line and state.description_line <= #lines then
+            table.remove(lines, state.description_line)
+          end
           state.showing_description = false
           state.description_line = nil
           
@@ -316,7 +331,9 @@ function M.setup_keymaps(state)
       elseif state.showing_description then
         -- Remove description if cursor moved to a non-todo line
         local lines = api.nvim_buf_get_lines(state.buffer, 0, -1, false)
-        table.remove(lines, state.description_line)
+        if state.description_line and state.description_line <= #lines then
+          table.remove(lines, state.description_line)
+        end
         state.showing_description = false
         state.description_line = nil
         
@@ -327,6 +344,20 @@ function M.setup_keymaps(state)
         
         -- Re-apply all highlights
         require("todo.ui.render").apply_highlighting(state)
+      end
+    end
+  })
+  
+  -- Prevent cursor from moving to invalid positions
+  api.nvim_create_autocmd("CursorMovedI", {
+    buffer = state.buffer,
+    callback = function()
+      local line = api.nvim_win_get_cursor(state.window)[1]
+      local total_lines = api.nvim_buf_line_count(state.buffer)
+      
+      -- Prevent cursor from going below the last todo
+      if line > total_lines then
+        api.nvim_win_set_cursor(state.window, {total_lines, 0})
       end
     end
   })
